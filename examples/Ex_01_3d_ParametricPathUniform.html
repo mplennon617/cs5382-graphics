@@ -1,0 +1,156 @@
+<html>
+  <!-- VERTEX SHADER SOURCE CODE: Written in GLSL -->
+  <script id="vertex-shader" type="x-shader/x-vertex">
+    #version 300 es
+
+    in vec4 aPosition;
+    uniform vec4 uOffset;
+
+    void main()
+    {
+      //gl_Position =  vec4(0.0, 0.0, 0.0, 1.0) + uOffset;
+      gl_Position =  aPosition + uOffset;
+      gl_PointSize = 30.0;
+    }
+  </script>
+
+  <!-- FRAGMENT SHADER SOURCE CODE: Written in GLSL -->
+  <script id="fragment-shader" type="x-shader/x-fragment">
+    #version 300 es
+
+    precision mediump float;
+
+    out vec4  fColor;
+
+    void main()
+    {
+        fColor = vec4(gl_FragCoord.x/512.0, 1.0, 0.0, 1.0 );
+    }
+  </script>
+
+  <canvas id="gl-canvas" width="512" height="512"> </canvas>
+
+  <!-- Written in Javascript -->
+  <script>
+    // This compiles and links the shaders to create a GPU program object
+    // The GLSL code above is parsed and provided as the source code
+    function initShaders(gl, vertexShaderId, fragmentShaderId) {
+      var vertShdr;
+      var fragShdr;
+
+      var vertElem = document.getElementById(vertexShaderId);
+      if (!vertElem) {
+        alert("Unable to load vertex shader " + vertexShaderId);
+        return -1;
+      } else {
+        vertShdr = gl.createShader(gl.VERTEX_SHADER);
+        gl.shaderSource(
+          vertShdr,
+          vertElem.textContent.replace(/^\s+|\s+$/g, "")
+        );
+        gl.compileShader(vertShdr);
+        if (!gl.getShaderParameter(vertShdr, gl.COMPILE_STATUS)) {
+          var msg =
+            "Vertex shader failed to compile.  The error log is:" +
+            "<pre>" +
+            gl.getShaderInfoLog(vertShdr) +
+            "</pre>";
+          alert(msg);
+          return -1;
+        }
+      }
+
+      var fragElem = document.getElementById(fragmentShaderId);
+      if (!fragElem) {
+        alert("Unable to load vertex shader " + fragmentShaderId);
+        return -1;
+      } else {
+        fragShdr = gl.createShader(gl.FRAGMENT_SHADER);
+        gl.shaderSource(
+          fragShdr,
+          fragElem.textContent.replace(/^\s+|\s+$/g, "")
+        );
+        gl.compileShader(fragShdr);
+        if (!gl.getShaderParameter(fragShdr, gl.COMPILE_STATUS)) {
+          var msg =
+            "Fragment shader failed to compile.  The error log is:" +
+            "<pre>" +
+            gl.getShaderInfoLog(fragShdr) +
+            "</pre>";
+          alert(msg);
+          return -1;
+        }
+      }
+
+      var program = gl.createProgram();
+      gl.attachShader(program, vertShdr);
+      gl.attachShader(program, fragShdr);
+      gl.linkProgram(program);
+
+      if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+        var msg =
+          "Shader program failed to link.  The error log is:" +
+          "<pre>" +
+          gl.getProgramInfoLog(program) +
+          "</pre>";
+        alert(msg);
+        return -1;
+      }
+
+      return program;
+    }
+
+    // EXECUTION: Code executes starting here when we launch this file
+    window.onload = function init() {
+      canvas = document.getElementById("gl-canvas");
+
+      gl = canvas.getContext("webgl2", { preserveDrawingBuffer: true }); // Create Graphics Device Context
+      if (!gl) {
+        alert("WebGL 2.0 isn't available");
+      }
+
+      //  Compile and link shaders to create a program object in the Graphics Device Context
+      program = initShaders(gl, "vertex-shader", "fragment-shader");
+      gl.useProgram(program);
+
+      var points = new Float32Array([
+        //   X        Y      Z  and  W are allowed to default here!
+        0.0, 0.4, -0.2, 0.0, 0.2, 0.0,
+      ]);
+
+      var pointsBuffer = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, pointsBuffer);
+      gl.bufferData(gl.ARRAY_BUFFER, points, gl.STATIC_DRAW);
+
+      // Associate out shader variables with our data buffer
+
+      var aPosition = gl.getAttribLocation(program, "aPosition");
+      gl.vertexAttribPointer(aPosition, 2, gl.FLOAT, false, 0, 0);
+      gl.enableVertexAttribArray(aPosition);
+
+      uOffsetLoc = gl.getUniformLocation(program, "uOffset");
+
+      gl.vertexAttrib3f(aPosition, 0.0, 0.0, 0.0);
+      t = 0.0;
+      gl.clearColor(1.0, 0.0, 0.0, 1.0);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+      render();
+    };
+    var uOffsetLoc;
+    var x;
+    var y;
+    var t;
+    function render() {
+      gl.clear(gl.COLOR_BUFFER_BIT);
+
+      t = t + 0.01;
+      x = 0.7 * Math.cos(t);
+      y = 0.7 * Math.sin(t);
+
+      gl.uniform4fv(uOffsetLoc, [x, y, 0.0, 0.0]);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+
+      requestAnimationFrame(render);
+    }
+  </script>
+</html>

@@ -1,0 +1,203 @@
+<html>
+
+<!-- VERTEX SHADER SOURCE CODE: Written in GLSL -->
+<script id="vertex-shader" type="x-shader/x-vertex">
+    #version 300 es
+
+    in vec4 aPosition;
+    in vec4 aColor;         // Add an attribute for this vertex for color
+    out vec4 vColor;        // Pass it on through the pipeline to be handled by fragment shader
+    void main()
+    {
+        gl_Position = aPosition;
+        gl_PointSize = 20.0;         // Required to be able to see individual points
+        vColor = aColor;
+    }
+</script>
+
+<!-- FRAGMENT SHADER SOURCE CODE: Written in GLSL -->
+<script id="fragment-shader" type="x-shader/x-fragment">
+    #version 300 es 
+    precision mediump float;
+    
+    in  vec4  vColor;        // Receive the color attribute passed from the vertex shader
+    out vec4  fColor;        // Set the color in the framebuffer
+
+    void main()
+    {
+       fColor = vColor;
+    }
+</script>
+
+
+<canvas id="gl-canvas" width="400" height="400"> </canvas>
+
+<!-- Written in Javascript -->
+<script>
+
+// Set up some global variables for graphics
+var canvas;       // Browser-managed drawing area on screen
+var gl;           // This is the drawing context
+var program;      // Compiled and linked GPU code
+var points;       // array of vertices as (x,y) pairs
+
+// This compiles and links the shaders to create a GPU program object
+// The GLSL code above is parsed and provided as the source code
+function initShaders( gl, vertexShaderId, fragmentShaderId ){
+    var vertShdr;
+    var fragShdr;
+
+    var vertElem = document.getElementById( vertexShaderId );
+    if ( !vertElem ) {
+        alert( "Unable to load vertex shader " + vertexShaderId );
+        return -1;
+    }
+    else {
+        vertShdr = gl.createShader( gl.VERTEX_SHADER );
+        gl.shaderSource( vertShdr, vertElem.textContent.replace(/^\s+|\s+$/g, '' ));
+        gl.compileShader( vertShdr );
+        if ( !gl.getShaderParameter(vertShdr, gl.COMPILE_STATUS) ) {
+            var msg = "Vertex shader failed to compile.  The error log is:"
+        	+ "<pre>" + gl.getShaderInfoLog( vertShdr ) + "</pre>";
+            alert( msg );
+            return -1;
+        }
+    }
+
+    var fragElem = document.getElementById( fragmentShaderId );
+    if ( !fragElem ) {
+        alert( "Unable to load vertex shader " + fragmentShaderId );
+        return -1;
+    }
+    else {
+        fragShdr = gl.createShader( gl.FRAGMENT_SHADER );
+        gl.shaderSource( fragShdr, fragElem.textContent.replace(/^\s+|\s+$/g, '' ) );
+        gl.compileShader( fragShdr );
+        if ( !gl.getShaderParameter(fragShdr, gl.COMPILE_STATUS) ) {
+            var msg = "Fragment shader failed to compile.  The error log is:"
+        	+ "<pre>" + gl.getShaderInfoLog( fragShdr ) + "</pre>";
+            alert( msg );
+            return -1;
+        }
+    }
+
+    program = gl.createProgram();
+    gl.attachShader( program, vertShdr );
+    gl.attachShader( program, fragShdr );
+    gl.linkProgram( program );
+
+    if ( !gl.getProgramParameter(program, gl.LINK_STATUS) ) {
+        var msg = "Shader program failed to link.  The error log is:"
+            + "<pre>" + gl.getProgramInfoLog( program ) + "</pre>";
+        alert( msg );
+        return -1;
+    }
+
+    return program;
+}
+
+// MODELING: This code defines vertices that describe the shape we want to draw
+function initializePoints()
+{
+   points = new Float32Array( [             // EXPERIMENT - change colors and primitve types
+   //  X ,  Y    R   G   B                  //  How can you get solid colored primitives?
+      0.0, 0.0,   1, 1, 0,                  //  How can you get different colored primitives 
+      0.0, 0.5,   1, 1, 0,                  //  How can you use this and drawArrays arguments
+      0.5, 0.5,   1, 1, 0,                  //    to mix types and colors with one set of data?
+      -0.5, -0.5, 1, 0, 0,
+      -0.5, 0.0,  1, 0, 1,
+       0.0, -0.5, 0, 1, 1
+      ]);
+
+}
+
+// Move Data from CPU to GPU : This code defines vertices that describe the shape we want to draw
+function initializeGPUBuffers() 
+{
+    var pointsBuffer = gl.createBuffer();
+    gl.bindBuffer( gl.ARRAY_BUFFER, pointsBuffer );
+    gl.bufferData( gl.ARRAY_BUFFER, points, gl.STATIC_DRAW );  
+    
+    // Associate out shader variables with our data buffer
+    var aPosition = gl.getAttribLocation( program, "aPosition" );
+    gl.vertexAttribPointer( aPosition, 2, gl.FLOAT, false, 5 * Float32Array.BYTES_PER_ELEMENT, 0);    // (x,y) floating point values provided
+    gl.enableVertexAttribArray( aPosition );  
+    
+       // Associate out shader variables with our data buffer
+    var aColor = gl.getAttribLocation( program, "aColor" );
+    gl.vertexAttribPointer( aColor, 3, gl.FLOAT, false, 5 * Float32Array.BYTES_PER_ELEMENT, 2 * Float32Array.BYTES_PER_ELEMENT);    // (x,y) floating point values provided
+    gl.enableVertexAttribArray( aColor);   
+}
+
+
+
+// RENDERING: This code configures the drawing context and
+//             commands the GPU to draw to framebuffer (drawing context).
+//            (But the browser makes it display on our canvas.)
+function render()
+{
+   // Configure area of canvas to map framebuffer
+    gl.viewport( 0, 0, canvas.width, canvas.height ); 
+    
+   // Configure color to use to clear all pixels  
+   //              Red  Green  Blue  Alpha   
+    gl.clearColor( 0.0,  1.0,  0.0,   1.0 );  // Changing this between runs is a nice visual verification you are runnign the code you think you are
+   
+
+    // Render
+    gl.clear( gl.COLOR_BUFFER_BIT );         // Set all pixels in the canvas to the color specied with gl.clearColor
+
+    gl.drawArrays( gl.TRIANGLES, 0,  3);      // Note the last argument!    
+    //gl.drawArrays( gl.LINES, 0,  6);         
+    //gl.drawArrays( gl.LINE_LOOP, 0,  6); 
+    //gl.drawArrays( gl.LINE_STRIP, 0,  6);         
+    //gl.drawArrays( gl.TRIANGLE_STRIP, 0,  6);     
+    //gl.drawArrays( gl.TRIANGLE_FAN, 0,  6);     
+    gl.drawArrays( gl.POINTS, 3,  3);       //   Note the second argument!
+
+}
+
+// EXECUTION: Code executes starting here when we launch this file
+window.onload = function init()
+{
+
+    ////////////////////////////////////////////////////////////////////////////////
+    //   Setup Browser for WebGL rendering
+    //
+    //   Grab the section of the screen for drawing. This is provided by the browser.
+    //   All graphic output is within the canvas in the browser
+    canvas = document.getElementById( "gl-canvas" );
+     
+    // Create a drawing context (framebuffer) for use by the GPU for rendering.
+    // This corresponds to the browser canvas ( but is not the same thing )
+    gl = canvas.getContext('webgl2');
+    if (!gl) { alert( "WebGL 2.0 isn't available" ); }
+ 
+    ////////////////////////////////////////////////////////////////////////////////  
+    //  Load shaders and initialize attribute buffers
+    //
+
+    var program = initShaders( gl, "vertex-shader", "fragment-shader" );
+    gl.useProgram( program );
+    
+    ////////////////////////////////////////////////////////////////////////////////   
+    // Load models
+    initializePoints();
+    
+    
+    ////////////////////////////////////////////////////////////////////////////////
+    // Load data from CPU into the GPU
+    //
+    initializeGPUBuffers();
+
+
+    ////////////////////////////////////////////////////////////////////////////////
+    // Configure WebGL drawning context settings and draw
+    //
+    render();
+};
+
+
+</script>
+
+</html>

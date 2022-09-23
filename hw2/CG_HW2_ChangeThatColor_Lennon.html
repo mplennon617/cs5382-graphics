@@ -1,0 +1,218 @@
+<html>
+  <!-- VERTEX SHADER SOURCE CODE: Written in GLSL -->
+  <script id="vertex-shader" type="x-shader/x-vertex">
+    #version 300 es
+
+    in vec4 aPosition;
+
+    void main()
+    {
+      gl_Position = aPosition;
+    }
+  </script>
+
+  <!-- FRAGMENT SHADER SOURCE CODE: Written in GLSL -->
+  <script id="fragment-shader" type="x-shader/x-fragment">
+    #version 300 es
+
+    precision mediump float;
+
+    out vec4 fColor;
+    uniform vec4 uColor;
+
+    // Here: see vColor as an 'out' variable from the vertex shader.
+    // Now set the fColor 'out' variable to this parameter.
+
+    void main()
+    {
+        fColor = uColor;
+    }
+  </script>
+
+  <canvas id="gl-canvas" width="512" height="512"> </canvas>
+  <form>
+    <label for="colorselector">Color:</label>
+    <select id="colorselector" name="colorselector">
+      <option value="red">Red</option>
+      <option value="blue">Blue</option>
+      <option value="green">Green</option>
+      <option value="vanilla">Vanilla</option>
+      <option value="chocolate">Chocolate</option>
+      <option value="strawberry">Strawberry</option>
+    </select>
+  </form>
+
+  <!-- Written in Javascript -->
+  <script>
+    // This compiles and links the shaders to create a GPU program object
+    // The GLSL code above is parsed and provided as the source code
+    function initShaders(gl, vertexShaderId, fragmentShaderId) {
+      var vertShdr;
+      var fragShdr;
+
+      var vertElem = document.getElementById(vertexShaderId);
+      if (!vertElem) {
+        alert("Unable to load vertex shader " + vertexShaderId);
+        return -1;
+      } else {
+        vertShdr = gl.createShader(gl.VERTEX_SHADER);
+        gl.shaderSource(
+          vertShdr,
+          vertElem.textContent.replace(/^\s+|\s+$/g, "")
+        );
+        gl.compileShader(vertShdr);
+        if (!gl.getShaderParameter(vertShdr, gl.COMPILE_STATUS)) {
+          var msg =
+            "Vertex shader failed to compile.  The error log is:" +
+            "<pre>" +
+            gl.getShaderInfoLog(vertShdr) +
+            "</pre>";
+          alert(msg);
+          return -1;
+        }
+      }
+
+      var fragElem = document.getElementById(fragmentShaderId);
+      if (!fragElem) {
+        alert("Unable to load vertex shader " + fragmentShaderId);
+        return -1;
+      } else {
+        fragShdr = gl.createShader(gl.FRAGMENT_SHADER);
+        gl.shaderSource(
+          fragShdr,
+          fragElem.textContent.replace(/^\s+|\s+$/g, "")
+        );
+        gl.compileShader(fragShdr);
+        if (!gl.getShaderParameter(fragShdr, gl.COMPILE_STATUS)) {
+          var msg =
+            "Fragment shader failed to compile.  The error log is:" +
+            "<pre>" +
+            gl.getShaderInfoLog(fragShdr) +
+            "</pre>";
+          alert(msg);
+          return -1;
+        }
+      }
+
+      var program = gl.createProgram();
+      gl.attachShader(program, vertShdr);
+      gl.attachShader(program, fragShdr);
+      gl.linkProgram(program);
+
+      if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+        var msg =
+          "Shader program failed to link.  The error log is:" +
+          "<pre>" +
+          gl.getProgramInfoLog(program) +
+          "</pre>";
+        alert(msg);
+        return -1;
+      }
+
+      return program;
+    }
+
+    // EXECUTION: Code executes starting here when we launch this file
+    window.onload = function init() {
+      canvas = document.getElementById("gl-canvas");
+
+      //
+      //   Grab the section of the screen for drawing.
+      //   All graphic output is within the canvas
+      //
+
+      gl = canvas.getContext("webgl2");
+      if (!gl) {
+        alert("WebGL 2.0 isn't available");
+      }
+
+      //
+      //  Initialize our data for a single triangle
+      //
+
+      ////////////////////////////////////////////////////////////////////////////////
+      //  Load shaders and initialize attribute buffers
+      //
+      program = initShaders(gl, "vertex-shader", "fragment-shader");
+      gl.useProgram(program);
+
+      ////////////////////////////////////////////////////////////////////////////////
+      // Define shapes (initialize points defining a triangle)
+      // The GPU expects typed arrays and uses 4D points (x,y,z,w)
+
+      var points = new Float32Array([
+        // X Y R G B
+        // Triangle 2
+        0.0, 0.2, -0.2, -0.2, 0.2, -0.2,
+      ]);
+
+      ////////////////////////////////////////////////////////////////////////////////
+      // Load the data into the GPU Buffers
+      //
+      var pointsBuffer = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, pointsBuffer);
+      gl.bufferData(gl.ARRAY_BUFFER, points, gl.STATIC_DRAW);
+
+      // Associate out shader variables with our data buffer
+      // First 2: X and Y positions. Last 3: RGB color values.
+
+      var aPosition = gl.getAttribLocation(program, "aPosition");
+      gl.vertexAttribPointer(aPosition, 2, gl.FLOAT, false, 0, 0);
+      gl.enableVertexAttribArray(aPosition);
+
+      // Uniform variables for color value.
+
+      uColorLoc = gl.getUniformLocation(program, "uColor");
+
+      ////////////////////////////////////////////////////////////////////////////////
+      // Configure WebGL settings and draw
+      //
+      // Configure area of canvas to map framebuffer
+      gl.viewport(0, 0, canvas.width, canvas.height); //
+
+      // Configure color to use to clear all pixels
+      gl.clearColor(1.0, 1.0, 1.0, 1.0); // Format: R, G, B, A  Normalized [0.0,1.0]
+
+      // Render
+      gl.clear(gl.COLOR_BUFFER_BIT); // Clear all pixels in the framebuffer
+      render();
+    };
+    var uColorLoc;
+    function render() {
+      // Render
+      gl.clear(gl.COLOR_BUFFER_BIT); // Clear all pixels in the framebuffer
+
+      let el = document.querySelector("#colorselector");
+      let colorString = el.options[el.selectedIndex].text;
+
+      let rgba = [];
+
+      switch (colorString) {
+        case "Red":
+          rgba = [1.0, 0.0, 0.0, 1.0];
+          break;
+        case "Green":
+          rgba = [0.0, 1.0, 0.0, 1.0];
+          break;
+        case "Blue":
+          rgba = [0.0, 0.0, 1.0, 1.0];
+          break;
+        case "Vanilla":
+          rgba = [0.95, 0.89, 0.67, 1.0];
+          break;
+        case "Chocolate":
+          rgba = [0.48, 0.24, 0.0, 1.0];
+          break;
+        case "Strawberry":
+          rgba = [0.98, 0.35, 0.55, 1.0];
+          break;
+        default:
+      }
+
+      gl.uniform4fv(uColorLoc, rgba); // Update color
+      gl.drawArrays(gl.TRIANGLES, 0, 3); // Draw
+
+      requestAnimationFrame(render);
+    }
+  </script>
+</html>
