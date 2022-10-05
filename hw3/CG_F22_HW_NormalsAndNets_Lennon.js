@@ -124,43 +124,87 @@ var colors = new Float32Array([
   0.0,
   1.0,
   1.0, // blue
+  1.0,
+  1.0,
+  0.0,
+  1.0, // yellow
+  0.0,
+  1.0,
+  0.0,
+  1.0, // green
+  1.0,
+  1.0,
+  1.0,
+  1.0, // white
+  0.0,
+  0.0,
+  1.0,
+  1.0, // blue
 ]);
+
+const dist = (p0, p1) => {
+  const dx = Math.abs(p0[0] - p1[0]);
+  const dy = Math.abs(p0[1] - p1[1]);
+  const dz = Math.abs(p0[2] - p1[2]);
+
+  return Math.sqrt(dx * dx + dy * dy + dz * dz);
+};
 
 const getCrossProduct = (startIdx) => {
   const p0 = points[startIdx];
   const p1 = points[startIdx + 1];
   const p2 = points[startIdx + 2];
+  console.log("Finding cp of", p0, p1, p2);
 
-  console.log("points:",p0,p1,p2);
+  const A = vec3(p0[0] - p1[0], p0[1] - p1[1], p0[2] - p1[2]);
+  const B = vec3(p0[0] - p2[0], p0[1] - p2[1], p0[2] - p2[2]);
 
-  const A = vec3(
-    p0[0] - p1[0],
-    p0[1] - p1[1],
-    p0[2] - p1[2]
-  );
-  const B = vec3(
-    p0[0] - p2[0],
-    p0[1] - p2[1],
-    p0[2] - p2[2]
-  );
-
-  console.log("vectors:",A,B);
+  console.log("A:",A, "B:",B);
 
   const cp = vec3(
     A[1] * B[2] - A[2] * B[1],
     A[2] * B[0] - A[0] * B[2],
-    A[1] * B[2] - A[2] * B[1]
+    A[0] * B[1] - A[1] * B[0]
   );
+  console.log("cp: " + cp);
 
   return cp;
 };
 
-// const appendNormals = () => {
-//     const face1 =
-//     const face2 =
-//     const face3 =
-//     const face4 =
-// }
+const getCenterOfTriangle = (startIdx) => {
+  const p0 = points[startIdx];
+  const p1 = points[startIdx + 1];
+  const p2 = points[startIdx + 2];
+  console.log("Finding center of", p0, p1, p2);
+
+  const center = vec3(
+    (p0[0] + p1[0] + p2[0])/3,
+    (p0[1] + p1[1] + p2[1])/3,
+    (p0[2] + p1[2] + p2[2])/3
+  );
+  console.log("center:", center);
+  return center;
+};
+
+const appendNormals = () => {
+  const len = points.length;
+  for (let i = 0; i < len; i += 3) {
+    console.log("----------------");
+    const cp = getCrossProduct(i);
+    const center = getCenterOfTriangle(i);
+
+    const normalStart = center;
+    const normalEnd = vec3(
+      cp[0] + center[0],
+      cp[1] + center[1],
+      cp[2] + center[2]
+    );
+    console.log("normalStart:", normalStart);
+    console.log("normalEnd:", normalEnd);
+
+    points = [...points, normalStart, normalEnd];
+  }
+};
 
 window.onload = function init() {
   canvas = document.getElementById("gl-canvas");
@@ -191,16 +235,13 @@ window.onload = function init() {
   gl.vertexAttribPointer(colorLoc, 4, gl.FLOAT, false, 0, 0);
   gl.enableVertexAttribArray(colorLoc);
 
-  const len = points.length;
-  for (let i = 0; i < len; i += 3) {
-    console.log(flatten(getCrossProduct(i)));
-    points = points.concat(flatten(getCrossProduct(i)));
-  }
-
+  // Append normals to the points array then change the array to Float32Array
+  console.log("Points without normals", points);
+  appendNormals();
+  console.log("Points with normals", points);
+  points = new Float32Array(flatten(points));
 
   // vertex position array atrribute buffer
-
-  points = new Float32Array(flatten(points));
 
   var vBuffer = gl.createBuffer();
   gl.bindBuffer(gl.ARRAY_BUFFER, vBuffer);
@@ -249,11 +290,10 @@ function render() {
 
   gl.uniform3fv(thetaLoc, [0, 0, 0]); // Update uniform in vertex shader with new rotation angle
   gl.uniform4fv(deltaLoc, [0, 0, 0, 0]); // Update uniform in vertex shader with new rotation angle
-  gl.drawArrays(gl.LINES, 0, 6); // Try changing the primitive type
   gl.uniform4fv(deltaLoc, deltaPoints);
   gl.uniform3fv(thetaLoc, theta); // Update uniform in vertex shader with new rotation angle
-  gl.drawArrays(gl.TRIANGLES, 0, 12); // Try changing the primitive type
-  gl.drawArrays(gl.LINES, 13, 4); // Try changing the primitive type
+  // gl.drawArrays(gl.TRIANGLES, 0, 12); // Try changing the primitive type
+  gl.drawArrays(gl.LINES, 11, 8); // Try changing the primitive type
 
   requestAnimationFrame(render); // Call to browser to refresh display
 }
