@@ -1,0 +1,241 @@
+
+<html>
+
+<!-- VERTEX SHADER SOURCE CODE: Written in GLSL -->
+<script id="vertex-shader" type="x-shader/x-vertex">
+#version 300 es
+
+in vec4 aPosition;      // VERTEX (Point in homogeneous coordinates)
+in vec4 aColor;
+out vec4 vColor;
+//uniform float uDeltaX;   // Translation in X
+//uniform float uDeltaY;   // Translation in Y
+
+float rand(float co) { return fract(sin(co*(91.3458)) * 47453.5453); }
+
+void main()
+{
+    // Construct a 4x4 translationmatrix Rz(theta) in COLUMN MAJOR order
+    float uDeltaX = 0.25 * float(gl_InstanceID);
+    //float uDeltaX = 0.25 * (-2.0 + float(gl_InstanceID));
+    //float uDeltaY = 0.25 * (-2.0 + float(gl_InstanceID));
+    float uDeltaY = 0.0;
+
+   mat4 txyz = mat4(
+       1.0,  0.0, 0.0, 0.0,
+       0.0,  1.0, 0.0, 0.0,
+       0.0,  0.0, 1.0, 0.0,
+       uDeltaX,  uDeltaY, 0.0, 1.0);
+
+  //gl_Position = txyz*aPosition;
+  
+  vColor = vec4 ( float(gl_InstanceID)/5.0, 0.0, 0.0, 1.0);
+
+  //vColor = aColor;
+  //vColor = vec4 ( rand(uDeltaX),rand(uDeltaX),rand(uDeltaX), 1.0);
+  gl_PointSize = 10.0;
+
+  gl_Position = aPosition + vec4 ( 0.25 * float(gl_InstanceID), 0.0, 0.0, 0.0);
+}
+</script>
+
+<!-- FRAGMENT SHADER SOURCE CODE: Written in GLSL -->
+<script id="fragment-shader" type="x-shader/x-fragment">
+#version 300 es
+
+precision mediump float;
+
+in vec4 vColor;
+out vec4 fColor;
+
+void main()
+{
+    fColor = vColor;
+}
+</script>
+
+<canvas id="gl-canvas" width="512" height="512"> </canvas>
+<div>
+    Translate along X-Axis <input id="TranslateX" type="range"
+     min="-1.5" max="1.5" step="0.1"  value="0" />
+</div>
+
+<div>
+    Translate along Y-Axis <input id="TranslateY" type="range"
+    min="-1.5" max="1.5" step="0.1"  value="0" />
+</div>
+
+<!-- Written in Javascript -->
+<script>
+ // Slider-controlled value for translation along x and y
+var sDeltaX =0.0;
+var sDeltaY = 0.0;
+
+// This compiles and links the shaders to create a GPU program object
+// The GLSL code above is parsed and provided as the source code
+function initShaders( gl, vertexShaderId, fragmentShaderId )
+{
+    var vertShdr;
+    var fragShdr;
+
+    var vertElem = document.getElementById( vertexShaderId );
+    if ( !vertElem ) {
+        alert( "Unable to load vertex shader " + vertexShaderId );
+        return -1;
+    }
+    else {
+        vertShdr = gl.createShader( gl.VERTEX_SHADER );
+        gl.shaderSource( vertShdr, vertElem.textContent.replace(/^\s+|\s+$/g, '' ));
+        gl.compileShader( vertShdr );
+        if ( !gl.getShaderParameter(vertShdr, gl.COMPILE_STATUS) ) {
+            var msg = "Vertex shader failed to compile.  The error log is:"
+        	+ "<pre>" + gl.getShaderInfoLog( vertShdr ) + "</pre>";
+            alert( msg );
+            return -1;
+        }
+    }
+
+    var fragElem = document.getElementById( fragmentShaderId );
+    if ( !fragElem ) {
+        alert( "Unable to load vertex shader " + fragmentShaderId );
+        return -1;
+    }
+    else {
+        fragShdr = gl.createShader( gl.FRAGMENT_SHADER );
+        gl.shaderSource( fragShdr, fragElem.textContent.replace(/^\s+|\s+$/g, '' ) );
+        gl.compileShader( fragShdr );
+        if ( !gl.getShaderParameter(fragShdr, gl.COMPILE_STATUS) ) {
+            var msg = "Fragment shader failed to compile.  The error log is:"
+        	+ "<pre>" + gl.getShaderInfoLog( fragShdr ) + "</pre>";
+            alert( msg );
+            return -1;
+        }
+    }
+
+    var program = gl.createProgram();
+    gl.attachShader( program, vertShdr );
+    gl.attachShader( program, fragShdr );
+    gl.linkProgram( program );
+
+    if ( !gl.getProgramParameter(program, gl.LINK_STATUS) ) {
+        var msg = "Shader program failed to link.  The error log is:"
+            + "<pre>" + gl.getProgramInfoLog( program ) + "</pre>";
+        alert( msg );
+        return -1;
+    }
+
+    return program;
+}
+
+
+// EXECUTION: Code executes starting here when we launch this file
+window.onload = function init()
+{
+    canvas = document.getElementById( "gl-canvas" );
+
+    //
+    //   Grab the section of the screen for drawing.  
+    //   All graphic output is within the canvas
+    //
+    
+    gl = canvas.getContext('webgl2');
+    if (!gl) { alert( "WebGL 2.0 isn't available" ); }
+
+    ////////////////////////////////////////////////////////////////////////////////  
+    //  Setup Event Handlers
+    //
+    document.getElementById("TranslateX").onpointermove = function(event) {
+        sDeltaX = event.target.value;  // Negate for counterclockwise rotation to left
+        render();
+    };
+
+    document.getElementById("TranslateY").onpointermove = function(event) {
+        sDeltaY =  event.target.value;  // Negate for counterclockwise rotation to left
+        render();
+    };
+    ////////////////////////////////////////////////////////////////////////////////  
+    //  Load shaders and initialize attribute buffers
+    //
+    program = initShaders( gl, "vertex-shader", "fragment-shader" );
+    gl.useProgram( program );
+    
+    
+    ////////////////////////////////////////////////////////////////////////////////   
+    // Define shapes (initialize points defining a triangle)
+    // The GPU expects typed arrays and uses 4D homogeneous coordinates (x,y,z,w)
+
+   
+    var points = new Float32Array([  
+        //  X     Y      Z=0, W=1       R    G    B  A=1
+          0.0 ,  0.0,                 0.0, 0.0, 0.0,      // Origin
+
+        //  X     Y      Z=0, W=1       R    G    B  A=1
+         -0.8 ,    0.0,                 1.0, 0.0, 0.0,      // X-Axis in RED
+          0.8,     0.0,                 1.0, 0.0, 0.0,
+          0.0 ,    0.8,                 0.0, 1.0, 0.0,      // Y-Axis in BLUE
+          0.0,    -0.8,                 0.0, 1.0, 0.0,
+
+         //  X     Y    Z=0, W=1    R    G    B   A=1     // Triangle in gradient
+         0.0 ,    0.5,                  0.0, 1.0, 0.0,
+        -0.3,     0.0,                  1.0, 0.0, 0.0,
+         0.3,     0.0,                  0.0, 0.0, 1.0
+        ]);
+
+   ////////////////////////////////////////////////////////////////////////////////   
+   // Load the data into the GPU Buffers
+   //
+    var pointsBuffer = gl.createBuffer();
+    gl.bindBuffer( gl.ARRAY_BUFFER, pointsBuffer );
+    gl.bufferData( gl.ARRAY_BUFFER, points, gl.STATIC_DRAW );
+
+    // Associate out shader variables with our data buffer
+    var aPosition = gl.getAttribLocation( program, "aPosition" );
+    gl.vertexAttribPointer( aPosition, 2, gl.FLOAT, false, 5 * Float32Array.BYTES_PER_ELEMENT, 0);    // (x,y) floating point values provided
+    gl.enableVertexAttribArray( aPosition );  
+    
+       // Associate out shader variables with our data buffer
+    var aColor = gl.getAttribLocation( program, "aColor" );
+    gl.vertexAttribPointer( aColor, 3, gl.FLOAT, false, 5 * Float32Array.BYTES_PER_ELEMENT, 2 * Float32Array.BYTES_PER_ELEMENT);    // (r,g,b) floating point values provided
+    gl.enableVertexAttribArray( aColor);   
+
+    ////////////////////////////////////////////////////////////////////////////////
+    // Get Locations of uniforms
+    //
+    uDeltaXLoc = gl.getUniformLocation(program, "uDeltaX");
+    uDeltaYLoc = gl.getUniformLocation(program, "uDeltaY");
+
+    ////////////////////////////////////////////////////////////////////////////////
+    // Configure WebGL settings and draw
+    //
+      // Configure area of canvas to map framebuffer
+    gl.viewport( 0, 0, canvas.width, canvas.height ); // 
+    
+    // Configure color to use to clear all pixels    
+    gl.clearColor( 1.0, 1.0, 1.0, 1.0 );    // Format: R, G, B, A  Normalized [0.0,1.0]   
+
+    // Render
+    render();
+};
+
+
+function render()
+{
+    gl.clear( gl.COLOR_BUFFER_BIT );
+
+    gl.uniform1f(uDeltaXLoc, 0.0);               // Clear translation
+    gl.uniform1f(uDeltaYLoc, 0.0);  
+    gl.drawArrays( gl.LINES, 1,  4);            // Draw Axes
+
+    gl.drawArrays(gl.POINT, 5,1);               // TOP OF TRIANGLE before translation for reference
+    gl.uniform1f(uDeltaXLoc, sDeltaX);          // Set translation
+    gl.uniform1f(uDeltaYLoc, sDeltaY);  
+
+    gl.drawArraysInstanced( gl.TRIANGLES, 5,  3, 5);        // Draw transformed points.
+    gl.drawArrays(gl.POINT, 5,1);               // TOP OF TRIANGLE
+
+    requestAnimationFrame(render);
+};
+
+</script>
+
+</html>
