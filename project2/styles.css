@@ -1,0 +1,39 @@
+body {
+    font-family: 'Verdana';
+    font-size: 20px;
+}
+
+.center {
+    margin: auto;
+    width: 50%;
+    /* border: 3px solid green; */
+    padding: 10px;
+}
+
+.justify-content-center {
+    justify-content: center;
+}
+
+/* Some CSS Button code I found from W3 Schools */
+/* https://www.w3schools.com/css/css3_buttons.asp */
+button {
+    background-color: #4CAF50; /* Green */
+    border: none;
+    color: white;
+    padding: 0.5vw 1vw;
+    margin: 1vh 0 1vh 0;
+    text-align: center;
+    text-decoration: none;
+    display: inline-block;
+    font-size: 20px;
+  }
+
+  button:hover {
+    background-color: #6ac46d; /* Green */
+    color: white;
+  }
+
+  div {
+    margin: 0.5vh 0 0.5vh 0;
+    font-size: 20px;
+  }

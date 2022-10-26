@@ -159,7 +159,7 @@ const getCrossProduct = (startIdx) => {
   const A = vec3(p0[0] - p1[0], p0[1] - p1[1], p0[2] - p1[2]);
   const B = vec3(p0[0] - p2[0], p0[1] - p2[1], p0[2] - p2[2]);
 
-  console.log("A:",A, "B:",B);
+  console.log("A:", A, "B:", B);
 
   const cp = vec3(
     A[1] * B[2] - A[2] * B[1],
@@ -178,9 +178,9 @@ const getCenterOfTriangle = (startIdx) => {
   console.log("Finding center of", p0, p1, p2);
 
   const center = vec3(
-    (p0[0] + p1[0] + p2[0])/3,
-    (p0[1] + p1[1] + p2[1])/3,
-    (p0[2] + p1[2] + p2[2])/3
+    (p0[0] + p1[0] + p2[0]) / 3,
+    (p0[1] + p1[1] + p2[1]) / 3,
+    (p0[2] + p1[2] + p2[2]) / 3
   );
   console.log("center:", center);
   return center;
