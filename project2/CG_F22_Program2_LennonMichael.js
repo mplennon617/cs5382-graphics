@@ -25,14 +25,14 @@ let projectionMatrix;
 
 // Enum - Array of rotation angles (in degrees) for each rotation axis
 const Base = 0;
-const HeadX = 1;
+const HeadZ = 1;
 const HeadY = 2;
 const EyesX = 3;
 const EyesY = 4;
 
 // Values set by sliders and render ticks.
 let thetaView = [0.0, 0.0, 0.0]; // Rotation angles for x, y and z axes
-let slideVals = [0, 0, 0, 0]; // Values for all user-controlled sliders
+let slideVals = [0, 0, 0, 0, 0]; // Values for all user-controlled sliders
 let toggleRot = true; // Toggle Rotation Control
 let dir = false; // Toggle Rotation Direction
 let freeze = false; // Toggle Freeze effect (Chain chomp stops jumping)
@@ -59,6 +59,7 @@ const CHAIN_INDICES_LENGTH = 4641;
 const HEAD_INDICES_LENGTH = 12761 - 8; // FIXME: 8 added here due to invalid connection to next shape. How to remove? Add 65535 somewhere?
 const EYES_INDICES_LENGTH = 228;
 const CHAIN_SPEED = 8;
+const LOOKING_DISTANCE = 0.7;
 
 // ----------------------------------------------------------------------
 //                           Fill Functions
@@ -460,19 +461,19 @@ window.onload = () => {
   };
 
   document.getElementById("cSlide").onchange = () => {
-    slideVals[0] = event.srcElement.value;
+    slideVals[Base] = event.srcElement.value;
   };
   document.getElementById("hxSlide").onchange = () => {
-    slideVals[1] = event.srcElement.value;
+    slideVals[HeadZ] = event.srcElement.value;
   };
   document.getElementById("hySlide").onchange = () => {
-    slideVals[1] = event.srcElement.value;
+    slideVals[HeadY] = event.srcElement.value;
   };
   document.getElementById("exSlide").onchange = () => {
-    slideVals[2] = event.srcElement.value;
+    slideVals[EyesX] = event.srcElement.value;
   };
   document.getElementById("eySlide").onchange = () => {
-    slideVals[3] = event.srcElement.value;
+    slideVals[EyesY] = event.srcElement.value;
   };
 
   render();
@@ -521,34 +522,31 @@ const base = (time) => {
  * @param {*} time
  */
 const head = (time) => {
-  let instanceMatrix = mult(
-    translate(NUM_CHAINS + 2, Math.abs(Math.sin(time * CHAIN_SPEED)), 0.0),
-    rotateX(270)
-  );
-  const t = mult(modelViewMatrix, instanceMatrix);
+  //   let instanceMatrix =// mult(
+  //     // translate(NUM_CHAINS + 2, Math.abs(Math.sin(time * CHAIN_SPEED)), 0.0),
+  //     rotateX(270)
+  // //  );
+  //   const t = mult(modelViewMatrix, instanceMatrix);
 
-  gl.uniformMatrix4fv(modelViewMatrixLoc, false, flatten(t));
+  //   gl.uniformMatrix4fv(modelViewMatrixLoc, false, flatten(t));
+
   gl.drawElements(
     gl.TRIANGLE_FAN,
     HEAD_INDICES_LENGTH,
     gl.UNSIGNED_SHORT,
     CHAIN_INDICES_LENGTH * 2
   );
-};
-
-/**
- *
- */
-const eyes = (time) => {
-  // TODO: USe scale matrix to reflect across Z axis for the other eye
 
   const headX = NUM_CHAINS + 2;
-  const headY = Math.abs(Math.sin(time * CHAIN_SPEED));
+  // const headY = -Math.abs(Math.sin(time * CHAIN_SPEED));
+  const toOrigin = translate(-headX, 0, 0);
+  const backToInitial = translate(0, Math.abs(Math.sin(time * CHAIN_SPEED)), headX);
 
-  let instanceMatrix = mult(
-    translate(headX + 1.4, headY + 1.2, 2),
-    mult(rotateY(90), rotateX(-10))
-  );
+
+
+  let instanceMatrix = mult(mult(mult(mult(toOrigin, rotateY(90)), rotateX(-10)),
+  translate(1.6, -0.3, 2.2)),backToInitial);
+
   let t = mult(modelViewMatrix, instanceMatrix);
 
   gl.uniformMatrix4fv(modelViewMatrixLoc, false, flatten(t));
@@ -559,11 +557,38 @@ const eyes = (time) => {
     (HEAD_INDICES_LENGTH + CHAIN_INDICES_LENGTH) * 2
   );
 
-  instanceMatrix = mult(
-    translate(headX + 1.5, headY + 1.2, 2.2),
-    mult(rotateY(90), rotateX(-10))
-  );
+  instanceMatrix = mult(mult(mult(mult(toOrigin, rotateY(90)), rotateX(-10)),
+  translate(-1.6, -0.3, 2.2)),backToInitial);
+
   t = mult(modelViewMatrix, instanceMatrix);
+
+  gl.uniformMatrix4fv(modelViewMatrixLoc, false, flatten(t));
+
+  gl.drawElements(
+    gl.TRIANGLE_FAN,
+    EYES_INDICES_LENGTH,
+    gl.UNSIGNED_SHORT,
+    (HEAD_INDICES_LENGTH + CHAIN_INDICES_LENGTH) * 2
+  );
+
+  
+};
+
+/**
+ *
+ */
+const eyes = (time) => {
+  // TODO: Use scale matrix to reflect across Z axis for the other eye
+
+  const headX = NUM_CHAINS + 2;
+  // const headY = -Math.abs(Math.sin(time * CHAIN_SPEED));
+  const toOrigin = translate(-headX, 0, 0);
+  const backToInitial = translate(0, Math.abs(Math.sin(time * CHAIN_SPEED)), headX);
+
+  let instanceMatrix = mult(mult(mult(mult(toOrigin, rotateY(90)), rotateX(-10)),
+  translate(1.6, -0.3, 2.3)),backToInitial);
+
+  let t = mult(modelViewMatrix, instanceMatrix);
 
   gl.uniformMatrix4fv(modelViewMatrixLoc, false, flatten(t));
 
@@ -574,24 +599,9 @@ const eyes = (time) => {
     (HEAD_INDICES_LENGTH + CHAIN_INDICES_LENGTH + EYES_INDICES_LENGTH) * 2
   );
 
-  instanceMatrix = mult(
-    translate(headX + 1.4, headY + 1.2, -2),
-    mult(rotateY(90), rotateX(-10))
-  );
-  t = mult(modelViewMatrix, instanceMatrix);
+  instanceMatrix = mult(mult(mult(mult(toOrigin, rotateY(90)), rotateX(-10)),
+  translate(-1.6, -0.3, 2.3)),backToInitial);
 
-  gl.uniformMatrix4fv(modelViewMatrixLoc, false, flatten(t));
-  gl.drawElements(
-    gl.TRIANGLE_FAN,
-    EYES_INDICES_LENGTH,
-    gl.UNSIGNED_SHORT,
-    (HEAD_INDICES_LENGTH + CHAIN_INDICES_LENGTH) * 2
-  );
-
-  instanceMatrix = mult(
-    translate(headX + 1.5, headY + 1.2, -2.2),
-    mult(rotateY(90), rotateX(-10))
-  );
   t = mult(modelViewMatrix, instanceMatrix);
 
   gl.uniformMatrix4fv(modelViewMatrixLoc, false, flatten(t));
@@ -634,8 +644,28 @@ const render = () => {
 
   gl.uniform3fv(thetaViewLoc, thetaView); // Update uniform in vertex shader with new rotation angle
 
-  modelViewMatrix = mult(modelViewMatrix, (rotate(slideVals[Head], vec3(0, 1, 0))));
+  modelViewMatrix = mult(
+    modelViewMatrix,
+    translate((NUM_CHAINS + 2) * ((NUM_CHAINS-1) / NUM_CHAINS), 0.0, 0.0)
+  );
+  modelViewMatrix = mult(
+    modelViewMatrix,
+    rotate(slideVals[HeadZ], vec3(0, 0, 1))
+  );
+  modelViewMatrix = mult(
+    modelViewMatrix,
+    rotate(slideVals[HeadY], vec3(0, 1, 0))
+  );
   head(t);
+
+  modelViewMatrix = mult(
+    modelViewMatrix,
+    translate(0, 0, slideVals[EyesX]*LOOKING_DISTANCE)
+  );
+  modelViewMatrix = mult(
+    modelViewMatrix,
+    translate(0, slideVals[EyesY]*LOOKING_DISTANCE, 0)
+  );
   eyes(t);
 
   if (freeze === false) {
