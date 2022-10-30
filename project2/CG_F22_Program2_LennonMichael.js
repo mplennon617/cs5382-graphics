@@ -1,11 +1,7 @@
-// TODO: Feature list
-// 1. Create shapes: one spheres for the chain chomp head and a bunch of cubes for the chains
-// 2. Ability to rotate head about chain chomp "origin", causing all chains to rotate with it
-// 3. Ability for chain chomp head to "look side to side" without the chains moving
-// 4. Ability for chain chomp to "jump" (sine wave jump. When the chomp returns to the ground, the chomp causes a camera shake effect and "squishes vertically"). All cubes will jump with it, given a specified delay for each cube
-// 5. Projection using MVnew code
-// 6. Terrain mesh
-// 7. If time: Create a slider to change the length the chain chomp from the origin. Should I procedurally add/remove cubes based on the length?
+// Michael Lennon
+// Computer Graphics Program 2
+// "The Chain Critter"
+// October 30, 2022
 
 "use strict"; // Enforce typing in javascript
 
@@ -23,13 +19,6 @@ let zAxis = 2;
 let modelViewMatrix;
 let projectionMatrix;
 
-// Enum - Array of rotation angles (in degrees) for each rotation axis
-const Base = 0;
-const HeadZ = 1;
-const HeadY = 2;
-const EyesX = 3;
-const EyesY = 4;
-
 // Values set by sliders and render ticks.
 let thetaView = [0.0, 0.0, 0.0]; // Rotation angles for x, y and z axes
 let slideVals = [0, 0, 0, 0, 0]; // Values for all user-controlled sliders
@@ -37,6 +26,13 @@ let toggleRot = true; // Toggle Rotation Control
 let dir = false; // Toggle Rotation Direction
 let freeze = false; // Toggle Freeze effect (Chain chomp stops jumping)
 let bigJumpState = false; // Toggle state -- is the Chomp performing a big jump?
+
+// Enum - Indices for all slider values. Used to index slideVals
+const Base = 0;
+const HeadZ = 1;
+const HeadY = 2;
+const EyesX = 3;
+const EyesY = 4;
 
 // Uniform value locations.
 let thetaViewLoc; // Holds shader uniform variable location
@@ -52,17 +48,16 @@ let vertices = []; // List of all vertices. An array of vec3s
 let indices = []; // List of all indices.
 
 // Constants.
-const numCirclePoints = 30; // Number of points used to construct each circle
+const numCirclePoints = 30; // Number of points used to construct each circle FIXME: This cannot be changed, unfortunately, due to other hardcoded constraints
 const NUM_CHAINS = 10; // Number of chains 'binding' the chain chomp to the origin.
-const CHAIN_LENGTH = 5;
-const CHAIN_INDICES_LENGTH = 4641;
-const HEAD_INDICES_LENGTH = 12761 - 8; // FIXME: 8 added here due to invalid connection to next shape. How to remove? Add 65535 somewhere?
-const EYES_INDICES_LENGTH = 228;
-const MESH_INDICES_LENGTH = 1806;
-const CHAIN_SPEED = 8;
-const LOOKING_DISTANCE = 0.5;
-const HEAD_SQUISH = 0.8;
-const MESH_SCALE = 0.3;
+const CHAIN_INDICES_LENGTH = 4641; // The number of elements in indices taken up by the chain sphere.
+const HEAD_INDICES_LENGTH = 12761 - 8; // The number of elements in indices taken up by the head sphere.
+const EYES_INDICES_LENGTH = 228; // The number of elements in indices taken up by the eye cylinder.
+const MESH_INDICES_LENGTH = 1806; // The number of elements in indices taken up by the 2D grass mesh.
+const CHAIN_SPEED = 8; // The speed at which the chain chomp bounces up and down.
+const LOOKING_DISTANCE = 0.5; // The distance that the eyes can translate relative to the center of the head.
+const HEAD_SQUISH = 0.8; // The amount that the head "squishes" after performing a big jump.
+const MESH_SCALE = 0.3; // The amount of random variation in the Y direction for the 2D mesh.
 
 // ----------------------------------------------------------------------
 //                           Fill Functions
@@ -96,7 +91,7 @@ const fillIndices = (newIndices) => {
 };
 
 /**
- * Fills the global color array with the given vector.
+ * Fills the global color array by linearly interpolating 2 color vectors.
  * @param {vec4} colorVec1 - The color to fill the vector with (RGBA)
  * @param {vec4} colorVec2 - The color to fill the vector with (RGBA)
  * @param {Array} vertices - The vertices to tie the color to (used for length)
@@ -196,6 +191,7 @@ const getSphereVertices = (
  * @param {Array} shape - Array of vec3s containing the shape to duplicate.
  * @param {*} len - The distance between the two parallel shapes.
  * @param {*} direction - The axis to duplicate the shape.
+ * @returns A list of points representing the two duplicated shapes. 
  */
 const getParallelVertices = (shape, len = 1, dir = "z") => {
   // Extrude in the negative direction if direction is set to false
@@ -216,10 +212,11 @@ const getParallelVertices = (shape, len = 1, dir = "z") => {
 };
 
 /**
- *
- * @param {*} sideLength
- * @param {*} numMeshPoints
- * @returns
+ * Returns a list of points representing a 2D square mesh. 
+ * Y values of each point are randomized with respect to MESH_SCALE.
+ * @param {int} sideLength - The length of each side in clip space.
+ * @param {*} numMeshLinePoints - The number of points across 1 dimension of the mesh.
+ * @returns A list of points representing a 2D square mesh. 
  */
 const getRandomMesh = (sideLength = 1.0, numMeshLinePoints = 20) => {
   // Adapted and modified from demo at end of class on 10.19.22.
@@ -248,7 +245,7 @@ const getRandomMesh = (sideLength = 1.0, numMeshLinePoints = 20) => {
  * Utility function for returing the indices used to connect all the points in a sphere.
  *
  * @param {int} verticesOffset - Wherre to begin connecting circles from the global indices array.
- * @param {int} numPoints - number of points for each circle.
+ * @param {int} numPoints - number of points for each circle (2D cross section).
  * @returns the modified indices array.
  */
 const connectSphere = (verticesOffset, numCirclePoints) => {
@@ -304,9 +301,11 @@ const connectParallelCylinders = (verticesOffset, numPoints) => {
 };
 
 /**
- *
- * @param {*} verticesOffset
- * @param {*} numMeshLinePoints
+ * Utility function for returing the indices used to connect a 2D square mesh.
+ * 
+ * @param {int} verticesOffset - Wherre to begin connecting circles from the global vertices array.
+ * @param {int} numMeshLinePoints - The number of points across 1 dimension of the mesh.
+ * @returns the modified indices array.
  */
 const connectMesh = (verticesOffset, numMeshLinePoints) => {
   let indices = [];
@@ -329,8 +328,6 @@ const connectMesh = (verticesOffset, numMeshLinePoints) => {
       // console.log(count++);
     }
   }
-  console.log("vertices (in connectMesh):",vertices);
-  console.log("indices to be added:",indices);
 
   return indices;
 };
@@ -366,7 +363,8 @@ const range = (start, end) => {
 // ----------------------------------------------------------------------
 
 /**
- *
+ * Function used to build up the colors, vertices, and indices arrays with
+ * all the instances to be drawn. Chains, head, eyes, and mesh.
  */
 const buildInstances = () => {
   // ***** Building the chains *****
@@ -420,28 +418,12 @@ const buildInstances = () => {
   );
 
   // ***** Building the mesh *****
-
-  console.log("vertices", vertices);
-  console.log("indices", indices);
-  console.log(
-    "indices offset",
-    HEAD_INDICES_LENGTH + CHAIN_INDICES_LENGTH + EYES_INDICES_LENGTH * 2 - 4
-  );
-
-  let mesh = getRandomMesh(20,20);
+  let mesh = getRandomMesh(20, 20);
   currOffset = vertices.length;
   fillVertices(mesh);
-  fillColor(vec4(0, 0.60, 0.10, 1.0), mesh);
+  fillColor(vec4(0, 0.6, 0.1, 1.0), mesh);
   const meshIndices = connectMesh(currOffset, 20);
-  // console.log("meshIndices", meshIndices);
   fillIndices(meshIndices);
-
-  console.log("vertices", vertices);
-  console.log("indices", indices);
-  console.log(
-    "indices offset",
-    HEAD_INDICES_LENGTH + CHAIN_INDICES_LENGTH + EYES_INDICES_LENGTH * 2 - 4
-  );
 
   // Prepare colors, vertices, and indices to be fed into the graphics pipeline.
   colors = flatten(colors);
@@ -514,6 +496,7 @@ window.onload = () => {
     flatten(projectionMatrix)
   );
 
+  // Define javascript events for the HTML elements used to manipulate the scene.
   document.getElementById("ButtonC").onclick = () => {
     dir = !dir;
   };
@@ -547,22 +530,19 @@ window.onload = () => {
     slideVals[EyesY] = event.srcElement.value;
   };
 
+  // Begin continuous rendering of the scene.
   render();
 };
-
-let x;
-let y;
-let z;
-let size;
-let b;
-let r;
 
 // ----------------------------------------------------------------------
 //         Render Functions (Called continuously during runtime)
 // ----------------------------------------------------------------------
 
+/**
+ * Function to draw the 2D mesh.
+ */
 const mesh = () => {
-  const t = mult(rotateZ(-8),mult(scale(15,1,1),translate(10,-1.6,0)));
+  const t = mult(rotateZ(-8), mult(scale(15, 1, 1), translate(10, -1.6, 0)));
 
   gl.uniformMatrix4fv(modelViewMatrixLoc, false, flatten(t));
   gl.drawElements(
@@ -575,8 +555,9 @@ const mesh = () => {
 };
 
 /**
- *
- * @param {*} time
+ * Function to draw the base (Each of the chain spheres). 
+ * Note the change in the instanceMatrix depending on bigJumpState.
+ * @param {*} time - The current time step - used for the bounce effect.
  */
 const base = (time) => {
   let bigJumpScale = bigJumpState === 1 ? 5 : 1;
@@ -656,8 +637,9 @@ const base = (time) => {
 };
 
 /**
- *
- * @param {*} time
+ * Function to draw the head (The large sphere, and the eye 'outlines'). 
+ * Note the changes in the instanceMatrix depending on bigJumpState.
+ * @param {*} time - The current time step - used for the bounce effect.
  */
 const head = (time) => {
   let bigJumpScale = bigJumpState === 1 ? 5 : 1;
@@ -720,10 +702,11 @@ const head = (time) => {
 };
 
 /**
- *
+ * Function to draw the eyes (The small dark eye cylinders). 
+ * Note the changes in the instanceMatrix depending on bigJumpState.
+ * @param {*} time - The current time step - used for the bounce effect.
  */
 const eyes = (time) => {
-  // TODO: Use scale matrix to reflect across Z axis for the other eye
 
   let bigJumpScale = bigJumpState === 1 ? 5 : 1;
   const timeOffset = 1.7;
