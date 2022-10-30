@@ -58,9 +58,11 @@ const CHAIN_LENGTH = 5;
 const CHAIN_INDICES_LENGTH = 4641;
 const HEAD_INDICES_LENGTH = 12761 - 8; // FIXME: 8 added here due to invalid connection to next shape. How to remove? Add 65535 somewhere?
 const EYES_INDICES_LENGTH = 228;
+const MESH_INDICES_LENGTH = 1806;
 const CHAIN_SPEED = 8;
 const LOOKING_DISTANCE = 0.5;
 const HEAD_SQUISH = 0.8;
+const MESH_SCALE = 0.3;
 
 // ----------------------------------------------------------------------
 //                           Fill Functions
@@ -214,6 +216,35 @@ const getParallelVertices = (shape, len = 1, dir = "z") => {
 };
 
 /**
+ *
+ * @param {*} sideLength
+ * @param {*} numMeshPoints
+ * @returns
+ */
+const getRandomMesh = (sideLength = 1.0, numMeshLinePoints = 20) => {
+  // Adapted and modified from demo at end of class on 10.19.22.
+  let points = [];
+
+  for (let i = 0; i < numMeshLinePoints; i++) {
+    for (let j = 0; j < numMeshLinePoints; j++) {
+      console.log([
+        i * (sideLength / numMeshLinePoints) - sideLength / 2,
+        MESH_SCALE * (2 * Math.random() - 1),
+        j * (sideLength / numMeshLinePoints) - sideLength / 2,
+      ]);
+      points.push(
+        vec3(
+          i * (sideLength / numMeshLinePoints) - sideLength / 2,
+          MESH_SCALE * (2 * Math.random() - 1),
+          j * (sideLength / numMeshLinePoints) - sideLength / 2
+        )
+      );
+    }
+  }
+  return points;
+};
+
+/**
  * Utility function for returing the indices used to connect all the points in a sphere.
  *
  * @param {int} verticesOffset - Wherre to begin connecting circles from the global indices array.
@@ -232,12 +263,6 @@ const connectSphere = (verticesOffset, numCirclePoints) => {
         currVerticesOffset + j + numCirclePoints + 1,
         currVerticesOffset + j + numCirclePoints,
         65535,
-      ]);
-      console.log([
-        currVerticesOffset + j,
-        currVerticesOffset + j + 1,
-        currVerticesOffset + j + numCirclePoints + 1,
-        currVerticesOffset + j + numCirclePoints,
       ]);
     }
     indices = indices.concat([
@@ -274,6 +299,38 @@ const connectParallelCylinders = (verticesOffset, numPoints) => {
       65535,
     ]);
   }
+
+  return indices;
+};
+
+/**
+ *
+ * @param {*} verticesOffset
+ * @param {*} numMeshLinePoints
+ */
+const connectMesh = (verticesOffset, numMeshLinePoints) => {
+  let indices = [];
+  let count = 0;
+  for (
+    let i = verticesOffset;
+    i < verticesOffset + numMeshLinePoints - 1;
+    i++
+  ) {
+    for (let j = i; j < i + numMeshLinePoints - 1; j++) {
+      {
+        indices = indices.concat([
+          j,
+          j + 1,
+          j + numMeshLinePoints + 1,
+          j + numMeshLinePoints,
+          65535,
+        ]);
+      }
+      // console.log(count++);
+    }
+  }
+  console.log("vertices (in connectMesh):",vertices);
+  console.log("indices to be added:",indices);
 
   return indices;
 };
@@ -321,7 +378,6 @@ const buildInstances = () => {
     chainSphere
   );
   fillIndices(connectSphere(0, 30));
-  console.log(vertices);
 
   // ***** Building the head *****
   let sphere1 = getSphereVertices(0, 0, 0, 3, 50);
@@ -332,7 +388,6 @@ const buildInstances = () => {
     sphere1
   );
   fillIndices(connectSphere(931, 50));
-  console.log(vertices);
 
   // ***** Building the eyes *****
   let eyeOffset = vertices.length;
@@ -350,13 +405,11 @@ const buildInstances = () => {
   fillVertices(eyeSm);
   fillColor(vec4(0.1, 0.1, 0.1, 1.0), eyeSm);
   // Parallel Circles
-  console.log("BEFORE:", indices.length);
   fillIndices(range(currOffset, currOffset + eyeLg.length / 2 - 1));
   fillIndices(
     range(currOffset + eyeLg.length / 2, currOffset + eyeLg.length - 1)
   );
   fillIndices(connectParallelCylinders(eyeOffset + 1, numCirclePoints));
-  console.log("AFTER:", indices.length);
   currOffset += eyeLg.length;
   fillIndices(range(currOffset, currOffset + eyeSm.length / 2 - 1));
   fillIndices(
@@ -364,6 +417,30 @@ const buildInstances = () => {
   );
   fillIndices(
     connectParallelCylinders(eyeOffset + eyeSm.length + 1, numCirclePoints)
+  );
+
+  // ***** Building the mesh *****
+
+  console.log("vertices", vertices);
+  console.log("indices", indices);
+  console.log(
+    "indices offset",
+    HEAD_INDICES_LENGTH + CHAIN_INDICES_LENGTH + EYES_INDICES_LENGTH * 2 - 4
+  );
+
+  let mesh = getRandomMesh(20,20);
+  currOffset = vertices.length;
+  fillVertices(mesh);
+  fillColor(vec4(0, 0.60, 0.10, 1.0), mesh);
+  const meshIndices = connectMesh(currOffset, 20);
+  // console.log("meshIndices", meshIndices);
+  fillIndices(meshIndices);
+
+  console.log("vertices", vertices);
+  console.log("indices", indices);
+  console.log(
+    "indices offset",
+    HEAD_INDICES_LENGTH + CHAIN_INDICES_LENGTH + EYES_INDICES_LENGTH * 2 - 4
   );
 
   // Prepare colors, vertices, and indices to be fed into the graphics pipeline.
@@ -437,21 +514,14 @@ window.onload = () => {
     flatten(projectionMatrix)
   );
 
-  // Event Listeners for all buttons.
-  // document.getElementById("xButton").onclick = () => {
-  //   axis = xAxis;
-  // };
-  // document.getElementById("yButton").onclick = () => {
-  //   axis = yAxis;
-  // };
-  // document.getElementById("zButton").onclick = () => {
-  //   axis = zAxis;
-  // };
   document.getElementById("ButtonC").onclick = () => {
     dir = !dir;
   };
   document.getElementById("ButtonT").onclick = () => {
     toggleRot = !toggleRot;
+  };
+  document.getElementById("ButtonR").onclick = () => {
+    slideVals = [0, 0, 0, 0, 0];
   };
   document.getElementById("ButtonF").onclick = () => {
     freeze = !freeze;
@@ -491,6 +561,19 @@ let r;
 //         Render Functions (Called continuously during runtime)
 // ----------------------------------------------------------------------
 
+const mesh = () => {
+  const t = mult(rotateZ(-8),mult(scale(15,1,1),translate(10,-1.6,0)));
+
+  gl.uniformMatrix4fv(modelViewMatrixLoc, false, flatten(t));
+  gl.drawElements(
+    gl.TRIANGLE_FAN,
+    MESH_INDICES_LENGTH,
+    gl.UNSIGNED_SHORT,
+    (HEAD_INDICES_LENGTH + CHAIN_INDICES_LENGTH + EYES_INDICES_LENGTH * 2 - 4) *
+      2
+  );
+};
+
 /**
  *
  * @param {*} time
@@ -506,14 +589,6 @@ const base = (time) => {
       ) <=
       0.05
   ) {
-    console.log(
-      "Last Y transform:",
-      bigJumpScale *
-        Math.abs(
-          Math.sin((1 / bigJumpScale) * (time * CHAIN_SPEED + (NUM_CHAINS - 1)))
-        )
-    );
-    console.log("t is", time);
     bigJumpState = 2;
   }
 
@@ -556,10 +631,6 @@ const base = (time) => {
           )
         );
 
-        console.log(
-          Math.cos((1 / bigJumpScale) * (time * CHAIN_SPEED + (NUM_CHAINS - 1)))
-        );
-        console.log("t,", time);
         if (
           time >= 2.82 &&
           Math.abs(
@@ -568,7 +639,6 @@ const base = (time) => {
             )
           ) >= 0.98
         ) {
-          console.log("t,", time);
           bigJumpState = 0;
         }
       }
@@ -715,6 +785,8 @@ const render = () => {
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
   // ***** Draw each part of the figure, manipulating the model View matrix as we go. *****
+  mesh();
+
   modelViewMatrix = rotate(slideVals[Base], vec3(0, 1, 0));
   base(t);
 
