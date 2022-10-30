@@ -38,11 +38,11 @@
                 0.0,  0.0, 1.0, 0.0,
                 0.0,  0.0, 0.0, 1.0 );
 
-        vec4 rotatedPosition = (rz * ry * rx * aPosition); 
+        mat4 rotationViewMatrix = (rz * ry * rx); 
                 
     
         vColor = aColor;
-        gl_Position = projectionMatrix * modelViewMatrix * rotatedPosition;
+        gl_Position = projectionMatrix * rotationViewMatrix * modelViewMatrix * aPosition;
         //gl_Position.z = -gl_Position.z;
         gl_PointSize = 30.0;
     }

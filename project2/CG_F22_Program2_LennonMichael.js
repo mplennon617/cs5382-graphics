@@ -29,7 +29,7 @@ var Head = 1;
 var Eyes = 2;
 
 // Values set by sliders and render ticks.
-let thetaView = [-1.65, 0.0, 0.0]; // Rotation angles for x, y and z axes
+let thetaView = [0.0, 0.0, 0.0]; // Rotation angles for x, y and z axes
 let theta = [0, 0, 0]; // Rotation angles for the chain chomp
 let delta = [0, 0, 0]; // Translation units for x, y, and z axes
 let flag = true; // Toggle Rotation Control
@@ -310,8 +310,8 @@ const buildInstances = () => {
   let chainSphere = getSphereVertices(0, 0, 0, 0.4, 30);
   fillVertices(chainSphere);
   fillSphereColorGradient(
-    vec4(0.27, 0.27, 0.4, 1.0),
-    vec4(1, 0, 0, 1.0),
+    vec4(1, 1, 1, 1.0),
+    vec4(0.67, 0.67, 0.8, 1.0),
     chainSphere
   );
   fillIndices(connectSphere(0, 30));
