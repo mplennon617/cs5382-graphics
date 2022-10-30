@@ -19,21 +19,23 @@ let xAxis = 0; //  Will be assigned on of these codes for
 let yAxis = 1; //
 let zAxis = 2;
 
-let theta = [-1.65, 0.0, 0.0]; // Rotation angles for x, y and z axes
+let thetaView = [-1.65, 0.0, 0.0]; // Rotation angles for x, y and z axes
+let theta = [0, 0, 0]; // Rotation angles for the chain chomp
 let delta = [0, 0, 0]; // Translation units for x, y, and z axes
 let flag = true; // Toggle Rotation Control
 let dir = false; // Toggle Rotation Direction
 
-let thetaLoc; // Holds shader uniform variable location
+let thetaViewLoc; // Holds shader uniform variable location
 let deltaLoc; // Holds shader uniform variable location
 let uColorLoc; // Uniform for Color shading.
 let uOffsetLoc; // Uniform for point offsets.
 let uPointSizeLoc; // Uniform for point size.
+let modelViewMatrixLoc;
 
 let colors = []; // List of all colors. An array of vec4s
 let vertices = []; // List of all vertices. An array of vec3s
 let indices = []; // List of all indices.
-let modes = []; // List of all drawing modes. (e.g. TRIANGLE_FAN, TRIANGLE_STRIP, etc.) Maps to each indexed primitive (0,...,65535).
+let instances = []; // List of all instances. Each value is a stored offset value on the instances array.
 
 let numCirclePoints = 30; // Number of points used to construct each circle
 let mOffset = 0;
@@ -150,13 +152,13 @@ const getSphereVertices = (
   points.push(vec3(x, y, z));
   for (let i = 0; i <= 1; i += 1.0 / numCirclePoints) {
     for (let j = 0; j <= 1; j += 1.0 / numCirclePoints) {
-      const theta = i * 2 * Math.PI;
+      const thetaView = i * 2 * Math.PI;
       const phi = j * 2 * Math.PI;
       points.push(
         vec3(
-          radius * Math.sin(theta) * Math.cos(phi),
-          radius * Math.sin(theta) * Math.sin(phi),
-          radius * Math.cos(theta)
+          radius * Math.sin(thetaView) * Math.cos(phi),
+          radius * Math.sin(thetaView) * Math.sin(phi),
+          radius * Math.cos(thetaView)
         )
       );
     }
@@ -329,6 +331,30 @@ const range = (start, end) => {
 // ----------------------------------------------------------------------
 
 /**
+ * 
+ */
+const buildInstances = () => {
+  let currOffset = 0;
+
+  let sphere1 = getSphereVertices(0, 0, 0, 0.5, 50);
+  // console.log("sphere1 vertices length: " + sphere1.length);
+  fillVertices(sphere1);
+  fillSphereColorGradient(vec4(0, 0, 0.4, 1.0), vec4(1,1,0,1.0), sphere1);
+  // fillColor(vec4(0,0,0.4,1.0),sphere1);
+  fillIndices(connectSphere(0, 50));
+
+  // TODO: -- TODO: -- TODO: -- TODO: -- TODO: -- TODO: -- TODO: -- TODO:
+  // Fill up the 'Modes' array for each call to fill indices.
+  // This can be used to specify drawing modes each time fillIndices is called (TRIANGLE_FAN, TRIANGLE_STRIP, etc)
+  // TODO: -- TODO: -- TODO: -- TODO: -- TODO: -- TODO: -- TODO: -- TODO:
+
+  // Prepare colors, vertices, and indices to be fed into the graphics pipeline.
+  colors = flatten(colors);
+  vertices = flatten(vertices);
+  indices = new Uint16Array(indices);
+}
+
+/**
  * Intializes shaders and bufferData.
  */
 window.onload = () => {
@@ -350,24 +376,7 @@ window.onload = () => {
   gl.useProgram(program);
 
   // Fill colors and vertices arrays with all the shapes.
-  let currOffset = 0;
-
-  let sphere1 = getSphereVertices(0, 0, 0, 0.5, 50);
-  // console.log("sphere1 vertices length: " + sphere1.length);
-  fillVertices(sphere1);
-  fillSphereColorGradient(vec4(0, 0, 0.4, 1.0), vec4(1,1,0,1.0), sphere1);
-  // fillColor(vec4(0,0,0.4,1.0),sphere1);
-  fillIndices(connectSphere(0, 50));
-
-  // TODO: -- TODO: -- TODO: -- TODO: -- TODO: -- TODO: -- TODO: -- TODO:
-  // Fill up the 'Modes' array for each call to fill indices.
-  // This can be used to specify drawing modes each time fillIndices is called (TRIANGLE_FAN, TRIANGLE_STRIP, etc)
-  // TODO: -- TODO: -- TODO: -- TODO: -- TODO: -- TODO: -- TODO: -- TODO:
-
-  // Prepare colors, vertices, and indices to be fed into the graphics pipeline.
-  colors = flatten(colors);
-  vertices = flatten(vertices);
-  indices = new Uint16Array(indices);
+  buildInstances();
 
   // Bind vertex colors (COLORS) to the gl array buffer.
   const cBuffer = gl.createBuffer();
@@ -393,8 +402,15 @@ window.onload = () => {
   gl.enableVertexAttribArray(positionLoc);
 
   // Define uniforms for pedestal translation and rotation.
-  thetaLoc = gl.getUniformLocation(program, "uTheta");
+  thetaViewLoc = gl.getUniformLocation(program, "uthetaView");
   deltaLoc = gl.getUniformLocation(program, "uDelta");
+
+  // Define transformation matrices for modelView and Projections.
+  modelViewMatrixLoc = gl.getUniformLocation(program, "modelViewMatrix");
+
+  const projectionMatrix = ortho(-10, 10, -10, 10, -10, 10);
+  gl.uniformMatrix4fv( gl.getUniformLocation(program, "projectionMatrix"),  false, flatten(projectionMatrix) );
+
 
   // Event Listeners for all buttons.
   document.getElementById("xButton").onclick = () => {
@@ -422,6 +438,7 @@ window.onload = () => {
   document.getElementById("zSlide").onchange = () => {
     delta[2] = event.srcElement.value;
   };
+
   render();
 };
 
@@ -432,10 +449,34 @@ let size;
 let b;
 let r;
 
+
+// ----------------------------------------------------------------------
+//                            Render Functions
+// ----------------------------------------------------------------------
+
+const base = () => {
+
+  const instanceMatrix = translate(0.0,0.5,0.0);
+
+  const t = mult(modelViewMatrix, instanceMatrix);
+  const currOffset = shift(instances);
+
+  gl.uniformMatrix4fv(modelViewMatrixLoc, false, flatten(t));
+  gl.drawElements(gl.TRIANGLE_FAN, indices.length, gl.UNSIGNED_SHORT, currOffset);
+}
+
+const head = () => {
+
+}
+
+const eyes = () => {
+
+}
+
 /**
- * Render function.
+ * Main Render function.
  */
-function render() {
+const render = () => {
   gl.useProgram(program);
   t += 0.01;
 
@@ -459,18 +500,20 @@ function render() {
   }
   if (flag) {
     if (dir) {
-      theta[axis] += 0.017 * speedMultiplier; // Increment rotation of currently active axis of rotation in radians
+      thetaView[axis] += 0.017 * speedMultiplier; // Increment rotation of currently active axis of rotation in radians
     } else {
-      theta[axis] -= 0.017 * speedMultiplier;
+      thetaView[axis] -= 0.017 * speedMultiplier;
     }
   }
+
+
 
   // Define Translation offset for the pedestal.
   let deltaPoints = new Float32Array([delta[0], delta[1], delta[2], 0.0]);
 
   // Draw the pedestal.
   gl.uniform4fv(deltaLoc, deltaPoints);
-  gl.uniform3fv(thetaLoc, theta); // Update uniform in vertex shader with new rotation angle
+  gl.uniform3fv(thetaViewLoc, thetaView); // Update uniform in vertex shader with new rotation angle
   gl.drawElements(gl.TRIANGLE_FAN, indices.length, gl.UNSIGNED_SHORT, 0);
 
   t = t + 0.01;
