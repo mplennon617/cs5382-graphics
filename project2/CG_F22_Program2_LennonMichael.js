@@ -59,7 +59,8 @@ const CHAIN_INDICES_LENGTH = 4641;
 const HEAD_INDICES_LENGTH = 12761 - 8; // FIXME: 8 added here due to invalid connection to next shape. How to remove? Add 65535 somewhere?
 const EYES_INDICES_LENGTH = 228;
 const CHAIN_SPEED = 8;
-const LOOKING_DISTANCE = 0.7;
+const LOOKING_DISTANCE = 0.5;
+const HEAD_SQUISH = 0.8;
 
 // ----------------------------------------------------------------------
 //                           Fill Functions
@@ -385,7 +386,7 @@ window.onload = () => {
   if (!gl) alert("WebGL 2.0 isn't available");
 
   gl.viewport(0, 0, canvas.width, canvas.height);
-  gl.clearColor(0.8, 0.8, 0.8, 1.0);
+  gl.clearColor(0.52, 0.8, 0.92, 1.0);
 
   gl.enable(gl.DEPTH_TEST);
   gl.enable(gl.PRIMITIVE_RESTART_FIXED_INDEX);
@@ -457,7 +458,7 @@ window.onload = () => {
   };
   document.getElementById("ButtonJ").onclick = () => {
     freeze = false;
-    bigJumpState = 1;
+    bigJumpState = 3;
   };
 
   document.getElementById("cSlide").onchange = () => {
@@ -495,17 +496,84 @@ let r;
  * @param {*} time
  */
 const base = (time) => {
+  let bigJumpScale = bigJumpState === 1 ? 5 : 1;
+
+  if (
+    bigJumpState === 1 &&
+    bigJumpScale *
+      Math.abs(
+        Math.sin((1 / bigJumpScale) * (time * CHAIN_SPEED + (NUM_CHAINS - 1)))
+      ) <=
+      0.05
+  ) {
+    console.log(
+      "Last Y transform:",
+      bigJumpScale *
+        Math.abs(
+          Math.sin((1 / bigJumpScale) * (time * CHAIN_SPEED + (NUM_CHAINS - 1)))
+        )
+    );
+    console.log("t is", time);
+    bigJumpState = 2;
+  }
+
   // Draw each of the the 'chain' spheres, layering translation matrices
   // each time.
   for (let i = 0; i < NUM_CHAINS; i++) {
     let instanceMatrix = mult(
       translate(
         (NUM_CHAINS + 2) * (i / NUM_CHAINS),
-        Math.abs(Math.sin(time * CHAIN_SPEED + i)),
+        bigJumpScale *
+          Math.abs(Math.sin((1 / bigJumpScale) * (time * CHAIN_SPEED + i))),
         0.0
       ),
       rotateX(270)
     );
+
+    // Change instanceMatrix for special cases regarding bigJumpState === 2
+    if (bigJumpState === 2) {
+      if (i === NUM_CHAINS - 1) {
+        instanceMatrix = mult(
+          mult(
+            translate(
+              (NUM_CHAINS + 2) * ((NUM_CHAINS - 1) / NUM_CHAINS),
+              0.0,
+              0.0
+            ),
+            rotateX(270)
+          ),
+          scale(
+            1,
+            1,
+            1 -
+              HEAD_SQUISH +
+              HEAD_SQUISH *
+                Math.abs(
+                  Math.cos(
+                    (1 / bigJumpScale) * (time * CHAIN_SPEED + (NUM_CHAINS - 1))
+                  )
+                )
+          )
+        );
+
+        console.log(
+          Math.cos((1 / bigJumpScale) * (time * CHAIN_SPEED + (NUM_CHAINS - 1)))
+        );
+        console.log("t,", time);
+        if (
+          time >= 2.82 &&
+          Math.abs(
+            Math.cos(
+              (1 / bigJumpScale) * (time * CHAIN_SPEED + (NUM_CHAINS - 1))
+            )
+          ) >= 0.98
+        ) {
+          console.log("t,", time);
+          bigJumpState = 0;
+        }
+      }
+    }
+
     const t = mult(modelViewMatrix, instanceMatrix);
     gl.uniformMatrix4fv(modelViewMatrixLoc, false, flatten(t));
     gl.drawElements(
@@ -522,13 +590,8 @@ const base = (time) => {
  * @param {*} time
  */
 const head = (time) => {
-  //   let instanceMatrix =// mult(
-  //     // translate(NUM_CHAINS + 2, Math.abs(Math.sin(time * CHAIN_SPEED)), 0.0),
-  //     rotateX(270)
-  // //  );
-  //   const t = mult(modelViewMatrix, instanceMatrix);
-
-  //   gl.uniformMatrix4fv(modelViewMatrixLoc, false, flatten(t));
+  let bigJumpScale = bigJumpState === 1 ? 5 : 1;
+  const timeOffset = 1.7;
 
   gl.drawElements(
     gl.TRIANGLE_FAN,
@@ -538,14 +601,23 @@ const head = (time) => {
   );
 
   const headX = NUM_CHAINS + 2;
-  // const headY = -Math.abs(Math.sin(time * CHAIN_SPEED));
   const toOrigin = translate(-headX, 0, 0);
-  const backToInitial = translate(0, Math.abs(Math.sin(time * CHAIN_SPEED)), headX);
+  const backToInitial = translate(
+    0,
+    bigJumpScale *
+      Math.abs(
+        Math.sin((1 / bigJumpScale) * (time * CHAIN_SPEED) + timeOffset)
+      ),
+    headX
+  );
 
-
-
-  let instanceMatrix = mult(mult(mult(mult(toOrigin, rotateY(90)), rotateX(-10)),
-  translate(1.6, -0.3, 2.2)),backToInitial);
+  let instanceMatrix = mult(
+    mult(
+      mult(mult(toOrigin, rotateY(90)), rotateX(-10)),
+      translate(1.6, -0.3, 2.2)
+    ),
+    backToInitial
+  );
 
   let t = mult(modelViewMatrix, instanceMatrix);
 
@@ -557,8 +629,13 @@ const head = (time) => {
     (HEAD_INDICES_LENGTH + CHAIN_INDICES_LENGTH) * 2
   );
 
-  instanceMatrix = mult(mult(mult(mult(toOrigin, rotateY(90)), rotateX(-10)),
-  translate(-1.6, -0.3, 2.2)),backToInitial);
+  instanceMatrix = mult(
+    mult(
+      mult(mult(toOrigin, rotateY(90)), rotateX(-10)),
+      translate(-1.6, -0.3, 2.2)
+    ),
+    backToInitial
+  );
 
   t = mult(modelViewMatrix, instanceMatrix);
 
@@ -570,8 +647,6 @@ const head = (time) => {
     gl.UNSIGNED_SHORT,
     (HEAD_INDICES_LENGTH + CHAIN_INDICES_LENGTH) * 2
   );
-
-  
 };
 
 /**
@@ -580,13 +655,25 @@ const head = (time) => {
 const eyes = (time) => {
   // TODO: Use scale matrix to reflect across Z axis for the other eye
 
-  const headX = NUM_CHAINS + 2;
-  // const headY = -Math.abs(Math.sin(time * CHAIN_SPEED));
-  const toOrigin = translate(-headX, 0, 0);
-  const backToInitial = translate(0, Math.abs(Math.sin(time * CHAIN_SPEED)), headX);
+  let bigJumpScale = bigJumpState === 1 ? 5 : 1;
+  const timeOffset = 1.7;
 
-  let instanceMatrix = mult(mult(mult(mult(toOrigin, rotateY(90)), rotateX(-10)),
-  translate(1.6, -0.3, 2.3)),backToInitial);
+  const headX = NUM_CHAINS + 2;
+  const toOrigin = translate(-headX, 0, 0);
+  const backToInitial = translate(
+    0,
+    bigJumpScale *
+      Math.abs(Math.sin((1 / bigJumpScale) * time * CHAIN_SPEED + timeOffset)),
+    headX
+  );
+
+  let instanceMatrix = mult(
+    mult(
+      mult(mult(toOrigin, rotateY(90)), rotateX(-10)),
+      translate(1.6, -0.3, 2.3)
+    ),
+    backToInitial
+  );
 
   let t = mult(modelViewMatrix, instanceMatrix);
 
@@ -599,8 +686,13 @@ const eyes = (time) => {
     (HEAD_INDICES_LENGTH + CHAIN_INDICES_LENGTH + EYES_INDICES_LENGTH) * 2
   );
 
-  instanceMatrix = mult(mult(mult(mult(toOrigin, rotateY(90)), rotateX(-10)),
-  translate(-1.6, -0.3, 2.3)),backToInitial);
+  instanceMatrix = mult(
+    mult(
+      mult(mult(toOrigin, rotateY(90)), rotateX(-10)),
+      translate(-1.6, -0.3, 2.3)
+    ),
+    backToInitial
+  );
 
   t = mult(modelViewMatrix, instanceMatrix);
 
@@ -622,8 +714,38 @@ const render = () => {
 
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-  // Handles rotation of the pedestal.
-  // Define controls for speed and direction of rotation.
+  // ***** Draw each part of the figure, manipulating the model View matrix as we go. *****
+  modelViewMatrix = rotate(slideVals[Base], vec3(0, 1, 0));
+  base(t);
+
+  gl.uniform3fv(thetaViewLoc, thetaView); // Update uniform in vertex shader with new rotation angle
+
+  modelViewMatrix = mult(
+    modelViewMatrix,
+    translate((NUM_CHAINS + 2) * ((NUM_CHAINS - 1) / NUM_CHAINS), 0.0, 0.0)
+  );
+  modelViewMatrix = mult(
+    modelViewMatrix,
+    rotate(slideVals[HeadZ], vec3(0, 0, 1))
+  );
+  modelViewMatrix = mult(
+    modelViewMatrix,
+    rotate(slideVals[HeadY], vec3(0, 1, 0))
+  );
+  head(t);
+
+  modelViewMatrix = mult(
+    modelViewMatrix,
+    translate(0, 0, slideVals[EyesX] * LOOKING_DISTANCE)
+  );
+  modelViewMatrix = mult(
+    modelViewMatrix,
+    translate(0, slideVals[EyesY] * LOOKING_DISTANCE, 0)
+  );
+  eyes(t);
+
+  // ***** Advance time and adjust movement based on user input. *****
+  // Speed
   let el = document.querySelector("#speedselector");
   let speedString = el.options[el.selectedIndex].text;
   let speedMultiplier = 1;
@@ -639,36 +761,14 @@ const render = () => {
       break;
   }
 
-  modelViewMatrix = rotate(slideVals[Base], vec3(0, 1, 0));
-  base(t);
-
-  gl.uniform3fv(thetaViewLoc, thetaView); // Update uniform in vertex shader with new rotation angle
-
-  modelViewMatrix = mult(
-    modelViewMatrix,
-    translate((NUM_CHAINS + 2) * ((NUM_CHAINS-1) / NUM_CHAINS), 0.0, 0.0)
-  );
-  modelViewMatrix = mult(
-    modelViewMatrix,
-    rotate(slideVals[HeadZ], vec3(0, 0, 1))
-  );
-  modelViewMatrix = mult(
-    modelViewMatrix,
-    rotate(slideVals[HeadY], vec3(0, 1, 0))
-  );
-  head(t);
-
-  modelViewMatrix = mult(
-    modelViewMatrix,
-    translate(0, 0, slideVals[EyesX]*LOOKING_DISTANCE)
-  );
-  modelViewMatrix = mult(
-    modelViewMatrix,
-    translate(0, slideVals[EyesY]*LOOKING_DISTANCE, 0)
-  );
-  eyes(t);
-
+  // Advance time and rotate view
   if (freeze === false) {
+    // Big jump is ready to go -- "Rewind time" to the beginning of the jump.
+    if (bigJumpState === 3) {
+      t = 0.86;
+      bigJumpState = 1;
+    }
+
     t = t + 0.01;
 
     if (toggleRot) {
