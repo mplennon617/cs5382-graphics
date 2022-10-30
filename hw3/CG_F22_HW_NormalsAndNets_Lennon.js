@@ -10,30 +10,30 @@ var zAxis = 2;
 
 var theta = [0, 0, 0]; // Rotation angles for x, y and z axes
 var thetaLoc; // Holds shader uniform variable location
-var delta = [0, 0, 0]; // Translation units for x, y, and z axes
-var deltaLoc; // Holds shader uniform variable location
+var sy = 1;
+var syLoc;
 var flag = true; // Toggle Rotation Control
 
 var points = [
   // Use Javascript typed arrays
 
   // Tetrahedron
-  vec3(0.0, 0.0, 1.0),
   vec3(1.0, 0.0, 0.0),
   vec3(-0.5, 0.866, 0.0),
+  vec3(0.0, 0.0, 1.0),
 
   vec3(1.0, 0.0, 0.0),
+  vec3(-0.5, -0.866, 0.0),
+  vec3(-0.5, 0.866, 0.0),
+
+  vec3(0.0, 0.0, 1.0),
   vec3(-0.5, 0.866, 0.0),
   vec3(-0.5, -0.866, 0.0),
 
-  vec3(-0.5, 0.866, 0.0),
+  vec3(0.0, 0.0, 1.0),
   vec3(-0.5, -0.866, 0.0),
-  vec3(0.0, 0.0, 1.0),
-
-  vec3(0.0, 0.0, 1.0),
   vec3(1.0, 0.0, 0.0),
-  vec3(-0.5, -0.866, 0.0),
-
+  
   // Trace back to starting point
   // 0.5, -0.5,  -0.5,
   // -0.5,-0.5, -0.5
@@ -44,111 +44,110 @@ var colors = new Float32Array([
   0.0,
   0.0,
   1.0,
+
+  0.5,
+  0.0,
+  0.0,
+  1.0,
+
+  0.5,
+  0.0,
+  0.0,
+  1.0,
+
+  0.0,
+  1.0,
+  0.0,
+  1.0,
+  
+  0.0,
+  0.5,
+  0.0,
+  1.0,
+
+  0.0,
+  0.5,
+  0.0,
+  1.0,
+
+  0.0,
+  0.0,
+  1.0,
+  1.0,
+
+  0.0,
+  0.0,
+  0.5,
+  1.0,
+
+  0.0,
+  0.0,
+  0.5,
+  1.0,
+
+  1.0,
+  0.0,
+  1.0,
+  1.0,
+
+  0.5,
+  0.0,
+  0.5,
+  1.0,
+
+  0.5,
+  0.0,
+  0.5,
+  1.0,
+
   1.0,
   0.0,
   0.0,
   1.0,
+
+  0.0,
+  0.0,
+  0.0,
+  1.0,
+
   0.0,
   1.0,
   0.0,
   1.0,
-  0.0,
-  1.0,
-  0.0,
-  1.0,
+
   0.0,
   0.0,
+  0.0,
   1.0,
-  1.0,
+
   0.0,
   0.0,
   1.0,
   1.0,
+
   0.0,
   0.0,
   0.0,
-  1.0, // black
   1.0,
-  0.0,
-  0.0,
-  1.0, // red
-  1.0,
-  1.0,
-  0.0,
-  1.0, // yellow
-  0.0,
-  1.0,
-  0.0,
-  1.0, // green
-  1.0,
-  1.0,
-  1.0,
-  1.0, // white
-  0.0,
-  0.0,
-  1.0,
-  1.0, // blue
+
   1.0,
   0.0,
   1.0,
-  1.0, // magenta
   1.0,
-  1.0,
-  1.0,
-  1.0, // white
-  0.0,
-  1.0,
-  1.0,
-  1.0, // cyan
+
   0.0,
   0.0,
   0.0,
-  1.0, // black
   1.0,
-  0.0,
-  0.0,
-  1.0, // red
-  1.0,
-  1.0,
-  0.0,
-  1.0, // yellow
-  0.0,
-  1.0,
-  0.0,
-  1.0, // green
-  1.0,
-  1.0,
-  1.0,
-  1.0, // white
-  0.0,
-  0.0,
-  1.0,
-  1.0, // blue
-  1.0,
-  1.0,
-  0.0,
-  1.0, // yellow
-  0.0,
-  1.0,
-  0.0,
-  1.0, // green
-  1.0,
-  1.0,
-  1.0,
-  1.0, // white
-  0.0,
-  0.0,
-  1.0,
-  1.0, // blue
 ]);
 
-const dist = (p0, p1) => {
-  const dx = Math.abs(p0[0] - p1[0]);
-  const dy = Math.abs(p0[1] - p1[1]);
-  const dz = Math.abs(p0[2] - p1[2]);
+// const dist = (p0, p1) => {
+//   const dx = Math.abs(p0[0] - p1[0]);
+//   const dy = Math.abs(p0[1] - p1[1]);
+//   const dz = Math.abs(p0[2] - p1[2]);
 
-  return Math.sqrt(dx * dx + dy * dy + dz * dz);
-};
+//   return Math.sqrt(dx * dx + dy * dy + dz * dz);
+// };
 
 const getCrossProduct = (startIdx) => {
   const p0 = points[startIdx];
@@ -156,16 +155,17 @@ const getCrossProduct = (startIdx) => {
   const p2 = points[startIdx + 2];
   console.log("Finding cp of", p0, p1, p2);
 
-  const A = vec3(p0[0] - p1[0], p0[1] - p1[1], p0[2] - p1[2]);
-  const B = vec3(p0[0] - p2[0], p0[1] - p2[1], p0[2] - p2[2]);
+  const A = vec3(p1[0] - p0[0], p1[1] - p0[1], p1[2] - p0[2]);
+  const B = vec3(p2[0] - p0[0], p2[1] - p0[1], p2[2] - p0[2]);
 
   console.log("A:", A, "B:", B);
 
-  const cp = vec3(
-    A[1] * B[2] - A[2] * B[1],
-    A[2] * B[0] - A[0] * B[2],
-    A[0] * B[1] - A[1] * B[0]
-  );
+  // const cp = vec3(
+  //   A[1] * B[2] - A[2] * B[1],
+  //   A[2] * B[0] - A[0] * B[2],
+  //   A[0] * B[1] - A[1] * B[0]
+  // );
+  const cp = cross(A,B);
   console.log("cp: " + cp);
 
   return cp;
@@ -199,6 +199,12 @@ const appendNormals = () => {
       cp[1] + center[1],
       cp[2] + center[2]
     );
+    // const normalEnd = vec3(
+    //   0.01 + center[0],
+    //   0.01 + center[1],
+    //   0.01 + center[2]
+    // );
+    
     console.log("normalStart:", normalStart);
     console.log("normalEnd:", normalEnd);
 
@@ -253,7 +259,7 @@ window.onload = function init() {
   gl.enableVertexAttribArray(positionLoc);
 
   thetaLoc = gl.getUniformLocation(program, "uTheta");
-  deltaLoc = gl.getUniformLocation(program, "uDelta");
+  syLoc = gl.getUniformLocation(program, "uSY");
   //event listeners for buttons
 
   document.getElementById("xButton").onclick = function () {
@@ -269,15 +275,13 @@ window.onload = function init() {
     flag = !flag;
   };
 
-  document.getElementById("xSlide").onchange = function () {
-    delta[0] = event.srcElement.value;
+  document.getElementById("sySlide").onchange = function () {
+    sy = event.srcElement.value;
   };
-  document.getElementById("ySlide").onchange = function () {
-    delta[1] = event.srcElement.value;
-  };
-  document.getElementById("zSlide").onchange = function () {
-    delta[2] = event.srcElement.value;
-  };
+  
+  console.log("POINTS DRAWN");
+  console.log(flatten(points));  
+
   render();
 };
 
@@ -286,16 +290,11 @@ function render() {
 
   if (flag) theta[axis] += 0.017; // Increment rotation of currently active axis of rotation in radians
 
-  let deltaPoints = new Float32Array([delta[0], delta[1], delta[2], 0.0]);
-
   gl.uniform3fv(thetaLoc, [0, 0, 0]); // Update uniform in vertex shader with new rotation angle
-  gl.uniform4fv(deltaLoc, [0, 0, 0, 0]); // Update uniform in vertex shader with new rotation angle
-  gl.uniform4fv(deltaLoc, deltaPoints);
+  gl.uniform1f(syLoc, sy); // Update uniform in vertex shader with new rotation angle
   gl.uniform3fv(thetaLoc, theta); // Update uniform in vertex shader with new rotation angle
-  // gl.drawArrays(gl.TRIANGLES, 0, 12); // Try changing the primitive type
-  gl.drawArrays(gl.LINES, 11, 8); // Try changing the primitive type
+  gl.drawArrays(gl.TRIANGLES, 0, 12); // Try changing the primitive type
+  gl.drawArrays(gl.LINES, 12, 8); // Try changing the primitive type
 
   requestAnimationFrame(render); // Call to browser to refresh display
 }
-
-console.log(flatten(points));

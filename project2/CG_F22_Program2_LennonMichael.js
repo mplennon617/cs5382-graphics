@@ -150,7 +150,7 @@ const getSphereVertices = (
   // Adapted and modified from demo at end of class on 10.19.22.
   let points = [];
   points.push(vec3(x, y, z));
-  for (let i = 0; i <= 1; i += 1.0 / numCirclePoints) {
+  for (let i = 0; i <= 1/2; i += 0.5 / numCirclePoints) {
     for (let j = 0; j <= 1; j += 1.0 / numCirclePoints) {
       const thetaView = i * 2 * Math.PI;
       const phi = j * 2 * Math.PI;
@@ -339,7 +339,7 @@ const buildInstances = () => {
   let sphere1 = getSphereVertices(0, 0, 0, 0.5, 50);
   // console.log("sphere1 vertices length: " + sphere1.length);
   fillVertices(sphere1);
-  fillSphereColorGradient(vec4(0, 0, 0.4, 1.0), vec4(1,1,0,1.0), sphere1);
+  fillSphereColorGradient(vec4(0.27,0.27,0.4,1.0), vec4(0,0,0,1.0), sphere1);
   // fillColor(vec4(0,0,0.4,1.0),sphere1);
   fillIndices(connectSphere(0, 50));
 
