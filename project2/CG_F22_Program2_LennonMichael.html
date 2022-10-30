@@ -6,13 +6,12 @@
     in  vec4 aPosition;
     in  vec4 aColor;
     out vec4 vColor;
-    
+
     uniform vec3 uThetaView;
-    uniform vec4 uDelta;
 
     uniform mat4 modelViewMatrix;
     uniform mat4 projectionMatrix;
-    
+
     void main()
     {
         // Compute the sines and cosines of theta for each of
@@ -20,27 +19,27 @@
         vec3 angles =  uThetaView ; // convert degrees to radians
         vec3 c = cos( angles );
         vec3 s = sin( angles );
-    
+
         // Remeber: thse matrices are column-major
         mat4 rx = mat4( 1.0,  0.0,  0.0, 0.0,
                 0.0,  c.x,  s.x, 0.0,
                 0.0, -s.x,  c.x, 0.0,
                 0.0,  0.0,  0.0, 1.0 );
-    
+
         mat4 ry = mat4( c.y, 0.0, -s.y, 0.0,
                 0.0, 1.0,  0.0, 0.0,
                 s.y, 0.0,  c.y, 0.0,
                 0.0, 0.0,  0.0, 1.0 );
-    
-    
+
+
         mat4 rz = mat4( c.z, s.z, 0.0, 0.0,
                 -s.z,  c.z, 0.0, 0.0,
                 0.0,  0.0, 1.0, 0.0,
                 0.0,  0.0, 0.0, 1.0 );
 
-        mat4 rotationViewMatrix = (rz * ry * rx); 
-                
-    
+        mat4 rotationViewMatrix = (rz * ry * rx);
+
+
         vColor = aColor;
         gl_Position = projectionMatrix * rotationViewMatrix * modelViewMatrix * aPosition;
         //gl_Position.z = -gl_Position.z;
@@ -52,10 +51,10 @@
     #version 300 es
 
     precision mediump float;
-    
+
     in vec4 vColor;
     out vec4 fColor;
-    
+
     void
     main()
     {
@@ -72,61 +71,101 @@
   <link rel="stylesheet" href="styles.css" />
   <body>
     <div class="center">
-      <canvas id="gl-canvas" width="700" height="700">
+      <canvas id="gl-canvas" width="600" height="600">
         Oops ... your browser doesn't support the HTML5 canvas element
       </canvas>
 
-      <br />
+      <hr />
 
-      <button id="xButton">Rotate X</button>
+      <!-- <button id="xButton">Rotate X</button>
       <button id="yButton">Rotate Y</button>
-      <button id="zButton">Rotate Z</button>
-      <button id="ButtonC">Switch Direction</button>
-      <button id="ButtonT">Toggle Rotation</button>
-      <form>
-        <label for="speedselector">Speed:</label>
-        <select id="speedselector" name="speedselector">
-          <option value="slow">Slow</option>
-          <option value="normal" selected>Normal</option>
-          <option value="fast">Fast</option>
-        </select>
-      </form>
-      <!-- <div>
-        Translate X -1
-        <input
-          id="xSlide"
-          type="range"
-          min="-1"
-          max="1"
-          step="0.1"
-          value="0.0"
-        />
-        1
-      </div>
+      <button id="zButton">Rotate Z</button> -->
       <div>
-        Translate Y -1
-        <input
-          id="ySlide"
-          type="range"
-          min="-1"
-          max="1"
-          step="0.1"
-          value="0.0"
-        />
-        1
+        <button id="ButtonT">Toggle Rotation</button>
+        <button id="ButtonC">Switch Direction</button>
+        <br />
+        <button id="ButtonF">Freeze!</button>
+        <!-- <button id="ButtonC">Big Jump!</button> -->
+        <button id="ButtonJ">Big Jump!</button>
+        <form>
+          <label for="speedselector">Speed:</label>
+          <select id="speedselector" name="speedselector">
+            <option value="slow">Slow</option>
+            <option value="normal" selected>Normal</option>
+            <option value="fast">Fast</option>
+          </select>
+        </form>
       </div>
+
+      <hr />
       <div>
-        Translate Z -1
-        <input
-          id="zSlide"
-          type="range"
-          min="-1"
-          max="1"
-          step="0.1"
-          value="0.0"
-        />
-        1
-      </div> -->
+        <div>
+          Chains Angle -60
+          <input
+            id="cSlide"
+            type="range"
+            min="-60"
+            max="60"
+            step="5"
+            value="0.0"
+          />
+          60
+        </div>
+
+        <div>
+          Head Angle (X) -90
+          <input
+            id="hxSlide"
+            type="range"
+            min="-90"
+            max="90"
+            step="5"
+            value="0.0"
+          />
+          90
+        </div>
+
+
+        <div>
+          Head Angle (Y) -90
+          <input
+            id="hySlide"
+            type="range"
+            min="-90"
+            max="90"
+            step="5"
+            value="0.0"
+          />
+          90
+        </div>
+
+
+        <div>
+          Eye (X) -1
+          <input
+            id="exSlide"
+            type="range"
+            min="-1"
+            max="1"
+            step="0.1"
+            value="0.0"
+          />
+          1
+        </div>
+
+        <div>
+          Eye (Y) -1
+          <input
+            id="eySlide"
+            type="range"
+            min="-1"
+            max="1"
+            step="0.1"
+            value="0.0"
+          />
+          1
+        </div>
+      </div>
     </div>
   </body>
 </html>

@@ -24,16 +24,19 @@ let modelViewMatrix;
 let projectionMatrix;
 
 // Enum - Array of rotation angles (in degrees) for each rotation axis
-var Base = 0;
-var Head = 1;
-var Eyes = 2;
+const Base = 0;
+const HeadX = 1;
+const HeadY = 2;
+const EyesX = 3;
+const EyesY = 4;
 
 // Values set by sliders and render ticks.
 let thetaView = [0.0, 0.0, 0.0]; // Rotation angles for x, y and z axes
-let theta = [0, 0, 0]; // Rotation angles for the chain chomp
-let delta = [0, 0, 0]; // Translation units for x, y, and z axes
-let flag = true; // Toggle Rotation Control
+let slideVals = [0, 0, 0, 0]; // Values for all user-controlled sliders
+let toggleRot = true; // Toggle Rotation Control
 let dir = false; // Toggle Rotation Direction
+let freeze = false; // Toggle Freeze effect (Chain chomp stops jumping)
+let bigJumpState = false; // Toggle state -- is the Chomp performing a big jump?
 
 // Uniform value locations.
 let thetaViewLoc; // Holds shader uniform variable location
@@ -50,10 +53,12 @@ let indices = []; // List of all indices.
 
 // Constants.
 const numCirclePoints = 30; // Number of points used to construct each circle
-const NUM_CHAINS = 5; // Number of chains 'binding' the chain chomp to the origin.
+const NUM_CHAINS = 10; // Number of chains 'binding' the chain chomp to the origin.
 const CHAIN_LENGTH = 5;
 const CHAIN_INDICES_LENGTH = 4641;
-const HEAD_INDICES_LENGTH = 12761;
+const HEAD_INDICES_LENGTH = 12761 - 8; // FIXME: 8 added here due to invalid connection to next shape. How to remove? Add 65535 somewhere?
+const EYES_INDICES_LENGTH = 228;
+const CHAIN_SPEED = 8;
 
 // ----------------------------------------------------------------------
 //                           Fill Functions
@@ -164,12 +169,11 @@ const getSphereVertices = (
 ) => {
   // Adapted and modified from demo at end of class on 10.19.22.
   let points = [];
-  points.push(vec3(x, y, z));
 
   for (let i = 0; i <= numCirclePoints; i++) {
     for (let j = 0; j < numCirclePoints; j++) {
-      const theta = (i/2/numCirclePoints) * 2 * Math.PI;
-      const phi = (j/numCirclePoints) * 2 * Math.PI;
+      const theta = (i / 2 / numCirclePoints) * 2 * Math.PI;
+      const phi = (j / numCirclePoints) * 2 * Math.PI;
       points.push(
         vec3(
           x + radius * Math.sin(theta) * Math.cos(phi),
@@ -208,10 +212,9 @@ const getParallelVertices = (shape, len = 1, dir = "z") => {
 };
 
 /**
- * Utility function for returing the indices used to connect 2 parallel circles.
- * Defines the height of a cylinder.
+ * Utility function for returing the indices used to connect all the points in a sphere.
  *
- * @param {int} indicesOffset - Wherre to begin connecting circles from the global indices array.
+ * @param {int} verticesOffset - Wherre to begin connecting circles from the global indices array.
  * @param {int} numPoints - number of points for each circle.
  * @returns the modified indices array.
  */
@@ -228,10 +231,12 @@ const connectSphere = (verticesOffset, numCirclePoints) => {
         currVerticesOffset + j + numCirclePoints,
         65535,
       ]);
-      console.log([currVerticesOffset + j,
+      console.log([
+        currVerticesOffset + j,
         currVerticesOffset + j + 1,
         currVerticesOffset + j + numCirclePoints + 1,
-        currVerticesOffset + j + numCirclePoints])
+        currVerticesOffset + j + numCirclePoints,
+      ]);
     }
     indices = indices.concat([
       currVerticesOffset,
@@ -249,16 +254,16 @@ const connectSphere = (verticesOffset, numCirclePoints) => {
  * Utility function for returing the indices used to connect 2 parallel circles.
  * Defines the height of a cylinder.
  *
- * @param {int} indicesOffset - Wherre to begin connecting circles from the global indices array.
+ * @param {int} verticesOffset - Wherre to begin connecting circles from the global vertices array.
  * @param {int} numPoints - number of points for each circle.
  * @returns the modified indices array.
  */
-const connectParallelCylinders = (indicesOffset, numPoints) => {
+const connectParallelCylinders = (verticesOffset, numPoints) => {
   let indices = [];
 
   let circle2Idx = numPoints + 1;
 
-  for (let i = indicesOffset; i <= indicesOffset + numPoints; i++) {
+  for (let i = verticesOffset; i <= verticesOffset + numPoints; i++) {
     indices = indices.concat([
       i,
       i + 1,
@@ -298,15 +303,14 @@ const range = (start, end) => {
 // ----------------------------------------------------------------------
 
 // ----------------------------------------------------------------------
-//                     GL program and Shader Setup
+//                         Instance Building
 // ----------------------------------------------------------------------
 
 /**
  *
  */
 const buildInstances = () => {
-  let currOffset = 0;
-
+  // ***** Building the chains *****
   let chainSphere = getSphereVertices(0, 0, 0, 0.4, 30);
   fillVertices(chainSphere);
   fillSphereColorGradient(
@@ -317,7 +321,8 @@ const buildInstances = () => {
   fillIndices(connectSphere(0, 30));
   console.log(vertices);
 
-  let sphere1 = getSphereVertices(0, 0, 0, 2, 50);
+  // ***** Building the head *****
+  let sphere1 = getSphereVertices(0, 0, 0, 3, 50);
   fillVertices(sphere1);
   fillSphereColorGradient(
     vec4(0.27, 0.27, 0.4, 1.0),
@@ -327,11 +332,47 @@ const buildInstances = () => {
   fillIndices(connectSphere(931, 50));
   console.log(vertices);
 
+  // ***** Building the eyes *****
+  let eyeOffset = vertices.length;
+  let currOffset = vertices.length;
+  let eyeLg = getParallelVertices(
+    getCircleVertices(0, 0, 0, 0.8, numCirclePoints),
+    0.5
+  );
+  let eyeSm = getParallelVertices(
+    getCircleVertices(0, 0, 0, 0.4, numCirclePoints),
+    0.5
+  );
+  fillVertices(eyeLg);
+  fillColor(vec4(1, 1, 1, 1.0), eyeLg);
+  fillVertices(eyeSm);
+  fillColor(vec4(0.1, 0.1, 0.1, 1.0), eyeSm);
+  // Parallel Circles
+  console.log("BEFORE:", indices.length);
+  fillIndices(range(currOffset, currOffset + eyeLg.length / 2 - 1));
+  fillIndices(
+    range(currOffset + eyeLg.length / 2, currOffset + eyeLg.length - 1)
+  );
+  fillIndices(connectParallelCylinders(eyeOffset + 1, numCirclePoints));
+  console.log("AFTER:", indices.length);
+  currOffset += eyeLg.length;
+  fillIndices(range(currOffset, currOffset + eyeSm.length / 2 - 1));
+  fillIndices(
+    range(currOffset + eyeSm.length / 2, currOffset + eyeSm.length - 1)
+  );
+  fillIndices(
+    connectParallelCylinders(eyeOffset + eyeSm.length + 1, numCirclePoints)
+  );
+
   // Prepare colors, vertices, and indices to be fed into the graphics pipeline.
   colors = flatten(colors);
   vertices = flatten(vertices);
   indices = new Uint16Array(indices);
 };
+
+// ----------------------------------------------------------------------
+//                     GL program and Shader Setup
+// ----------------------------------------------------------------------
 
 /**
  * Intializes shaders and bufferData.
@@ -387,7 +428,7 @@ window.onload = () => {
   // Define transformation matrices for modelView and Projections.
   modelViewMatrixLoc = gl.getUniformLocation(program, "modelViewMatrix");
 
-  const projectionMatrix = ortho(-10, 10, -10, 10, -10, 10);
+  const projectionMatrix = ortho(-15, 15, -15, 15, -15, 15);
   gl.uniformMatrix4fv(
     gl.getUniformLocation(program, "projectionMatrix"),
     false,
@@ -395,31 +436,44 @@ window.onload = () => {
   );
 
   // Event Listeners for all buttons.
-  document.getElementById("xButton").onclick = () => {
-    axis = xAxis;
-  };
-  document.getElementById("yButton").onclick = () => {
-    axis = yAxis;
-  };
-  document.getElementById("zButton").onclick = () => {
-    axis = zAxis;
-  };
+  // document.getElementById("xButton").onclick = () => {
+  //   axis = xAxis;
+  // };
+  // document.getElementById("yButton").onclick = () => {
+  //   axis = yAxis;
+  // };
+  // document.getElementById("zButton").onclick = () => {
+  //   axis = zAxis;
+  // };
   document.getElementById("ButtonC").onclick = () => {
     dir = !dir;
   };
   document.getElementById("ButtonT").onclick = () => {
-    flag = !flag;
+    toggleRot = !toggleRot;
+  };
+  document.getElementById("ButtonF").onclick = () => {
+    freeze = !freeze;
+  };
+  document.getElementById("ButtonJ").onclick = () => {
+    freeze = false;
+    bigJumpState = 1;
   };
 
-  // document.getElementById("xSlide").onchange = () => {
-  //   delta[0] = event.srcElement.value;
-  // };
-  // document.getElementById("ySlide").onchange = () => {
-  //   delta[1] = event.srcElement.value;
-  // };
-  // document.getElementById("zSlide").onchange = () => {
-  //   delta[2] = event.srcElement.value;
-  // };
+  document.getElementById("cSlide").onchange = () => {
+    slideVals[0] = event.srcElement.value;
+  };
+  document.getElementById("hxSlide").onchange = () => {
+    slideVals[1] = event.srcElement.value;
+  };
+  document.getElementById("hySlide").onchange = () => {
+    slideVals[1] = event.srcElement.value;
+  };
+  document.getElementById("exSlide").onchange = () => {
+    slideVals[2] = event.srcElement.value;
+  };
+  document.getElementById("eySlide").onchange = () => {
+    slideVals[3] = event.srcElement.value;
+  };
 
   render();
 };
@@ -432,42 +486,129 @@ let b;
 let r;
 
 // ----------------------------------------------------------------------
-//                            Render Functions
+//         Render Functions (Called continuously during runtime)
 // ----------------------------------------------------------------------
 
-const base = () => {
+/**
+ *
+ * @param {*} time
+ */
+const base = (time) => {
   // Draw each of the the 'chain' spheres, layering translation matrices
   // each time.
   for (let i = 0; i < NUM_CHAINS; i++) {
-    let instanceMatrix = translate(
-      (NUM_CHAINS + 2) * (i / NUM_CHAINS),
-      0.0,
-      0.0
+    let instanceMatrix = mult(
+      translate(
+        (NUM_CHAINS + 2) * (i / NUM_CHAINS),
+        Math.abs(Math.sin(time * CHAIN_SPEED + i)),
+        0.0
+      ),
+      rotateX(270)
     );
     const t = mult(modelViewMatrix, instanceMatrix);
     gl.uniformMatrix4fv(modelViewMatrixLoc, false, flatten(t));
-    gl.drawElements(gl.TRIANGLE_FAN, CHAIN_INDICES_LENGTH, gl.UNSIGNED_SHORT, 0);
+    gl.drawElements(
+      gl.TRIANGLE_FAN,
+      CHAIN_INDICES_LENGTH,
+      gl.UNSIGNED_SHORT,
+      0
+    );
   }
+};
 
-  // TODO: Move the 'head' drawing to the head method.
-
-  let instanceMatrix = translate(NUM_CHAINS + 2, 0.0, 0.0);
+/**
+ *
+ * @param {*} time
+ */
+const head = (time) => {
+  let instanceMatrix = mult(
+    translate(NUM_CHAINS + 2, Math.abs(Math.sin(time * CHAIN_SPEED)), 0.0),
+    rotateX(270)
+  );
   const t = mult(modelViewMatrix, instanceMatrix);
 
   gl.uniformMatrix4fv(modelViewMatrixLoc, false, flatten(t));
-  gl.drawElements(gl.TRIANGLE_FAN, HEAD_INDICES_LENGTH, gl.UNSIGNED_SHORT, CHAIN_INDICES_LENGTH*2);
+  gl.drawElements(
+    gl.TRIANGLE_FAN,
+    HEAD_INDICES_LENGTH,
+    gl.UNSIGNED_SHORT,
+    CHAIN_INDICES_LENGTH * 2
+  );
 };
 
-const head = () => {};
+/**
+ *
+ */
+const eyes = (time) => {
+  // TODO: USe scale matrix to reflect across Z axis for the other eye
 
-const eyes = () => {};
+  const headX = NUM_CHAINS + 2;
+  const headY = Math.abs(Math.sin(time * CHAIN_SPEED));
+
+  let instanceMatrix = mult(
+    translate(headX + 1.4, headY + 1.2, 2),
+    mult(rotateY(90), rotateX(-10))
+  );
+  let t = mult(modelViewMatrix, instanceMatrix);
+
+  gl.uniformMatrix4fv(modelViewMatrixLoc, false, flatten(t));
+  gl.drawElements(
+    gl.TRIANGLE_FAN,
+    EYES_INDICES_LENGTH,
+    gl.UNSIGNED_SHORT,
+    (HEAD_INDICES_LENGTH + CHAIN_INDICES_LENGTH) * 2
+  );
+
+  instanceMatrix = mult(
+    translate(headX + 1.5, headY + 1.2, 2.2),
+    mult(rotateY(90), rotateX(-10))
+  );
+  t = mult(modelViewMatrix, instanceMatrix);
+
+  gl.uniformMatrix4fv(modelViewMatrixLoc, false, flatten(t));
+
+  gl.drawElements(
+    gl.TRIANGLE_FAN,
+    EYES_INDICES_LENGTH - 6,
+    gl.UNSIGNED_SHORT,
+    (HEAD_INDICES_LENGTH + CHAIN_INDICES_LENGTH + EYES_INDICES_LENGTH) * 2
+  );
+
+  instanceMatrix = mult(
+    translate(headX + 1.4, headY + 1.2, -2),
+    mult(rotateY(90), rotateX(-10))
+  );
+  t = mult(modelViewMatrix, instanceMatrix);
+
+  gl.uniformMatrix4fv(modelViewMatrixLoc, false, flatten(t));
+  gl.drawElements(
+    gl.TRIANGLE_FAN,
+    EYES_INDICES_LENGTH,
+    gl.UNSIGNED_SHORT,
+    (HEAD_INDICES_LENGTH + CHAIN_INDICES_LENGTH) * 2
+  );
+
+  instanceMatrix = mult(
+    translate(headX + 1.5, headY + 1.2, -2.2),
+    mult(rotateY(90), rotateX(-10))
+  );
+  t = mult(modelViewMatrix, instanceMatrix);
+
+  gl.uniformMatrix4fv(modelViewMatrixLoc, false, flatten(t));
+
+  gl.drawElements(
+    gl.TRIANGLE_FAN,
+    EYES_INDICES_LENGTH - 6,
+    gl.UNSIGNED_SHORT,
+    (HEAD_INDICES_LENGTH + CHAIN_INDICES_LENGTH + EYES_INDICES_LENGTH) * 2
+  );
+};
 
 /**
  * Main Render function.
  */
 const render = () => {
   gl.useProgram(program);
-  t += 0.01;
 
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
@@ -484,30 +625,30 @@ const render = () => {
       speedMultiplier = 1;
       break;
     case "Fast":
-      speedMultiplier = 2;
+      speedMultiplier = 1.5;
       break;
   }
-  if (flag) {
-    if (dir) {
-      thetaView[axis] += 0.017 * speedMultiplier; // Increment rotation of currently active axis of rotation in radians
-    } else {
-      thetaView[axis] -= 0.017 * speedMultiplier;
+
+  modelViewMatrix = rotate(slideVals[Base], vec3(0, 1, 0));
+  base(t);
+
+  gl.uniform3fv(thetaViewLoc, thetaView); // Update uniform in vertex shader with new rotation angle
+
+  modelViewMatrix = mult(modelViewMatrix, (rotate(slideVals[Head], vec3(0, 1, 0))));
+  head(t);
+  eyes(t);
+
+  if (freeze === false) {
+    t = t + 0.01;
+
+    if (toggleRot) {
+      if (dir) {
+        thetaView[axis] += 0.017 * speedMultiplier; // Increment rotation of currently active axis of rotation in radians
+      } else {
+        thetaView[axis] -= 0.017 * speedMultiplier;
+      }
     }
   }
 
-  modelViewMatrix = rotate(0, vec3(0, 1, 0));
-  base();
-
-  // Define Translation offset for the pedestal.
-  let deltaPoints = new Float32Array([delta[0], delta[1], delta[2], 0.0]);
-
-  // Draw the pedestal.
-  gl.uniform4fv(deltaLoc, deltaPoints);
-  gl.uniform3fv(thetaViewLoc, thetaView); // Update uniform in vertex shader with new rotation angle
-
-  base();
-  // gl.drawElements(gl.TRIANGLE_FAN, indices.length, gl.UNSIGNED_SHORT, 0);
-
-  t = t + 0.01;
   requestAnimationFrame(render); // Call to browser to refresh display
 };
