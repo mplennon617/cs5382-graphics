@@ -17,7 +17,7 @@ body {
 /* Some CSS Button code I found from W3 Schools */
 /* https://www.w3schools.com/css/css3_buttons.asp */
 button {
-    background-color: #4CAF50; /* Green */
+    background-color: #4c6faf; /* Green */
     border: none;
     color: white;
     padding: 0.5vw 1vw;
@@ -29,7 +29,7 @@ button {
   }
 
   button:hover {
-    background-color: #6ac46d; /* Green */
+    background-color: rgb(130, 150, 202); /* Green */
     color: white;
   }
 
