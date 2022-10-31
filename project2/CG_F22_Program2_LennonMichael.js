@@ -242,7 +242,7 @@ const connectSphere = (indicesOffset, numCirclePoints) => {
 
   for (let i = 0; i < numCirclePoints - 1; i++) {
     for (let j = 0; j <= numCirclePoints; j++) {
-      const currIndicesOffset = i * numCirclePoints;
+      const currIndicesOffset = indicesOffset + i * numCirclePoints;
       indices = indices.concat([
         currIndicesOffset + j,
         currIndicesOffset + j + 1,
@@ -352,12 +352,18 @@ window.onload = () => {
   // Fill colors and vertices arrays with all the shapes.
   let currOffset = 0;
 
-  let sphere1 = getSphereVertices(0, 0, 0, 0.5, 50);
+  let sphere1 = getSphereVertices(0, 0, 0, 0.5, 30);
   // console.log("sphere1 vertices length: " + sphere1.length);
   fillVertices(sphere1);
   fillSphereColorGradient(vec4(0.27,0.27,0.4,1.0), vec4(0,0,0,1.0), sphere1);
-  // fillColor(vec4(0,0,0.4,1.0),sphere1);
-  fillIndices(connectSphere(0, 50));
+  // fillIndices(connectSphere(0, 30));
+  currOffset += sphere1.length;
+  console.log("indices.length:",indices.length);
+
+  let sphere2 = getSphereVertices(0, 0, 0, 0.1, 20);
+  fillVertices(sphere2);
+  fillSphereColorGradient(vec4(0.8,0.8,1,1.0), vec4(1,1,1,1.0), sphere1);
+  fillIndices(connectSphere(currOffset, 20));
 
   // TODO: -- TODO: -- TODO: -- TODO: -- TODO: -- TODO: -- TODO: -- TODO:
   // Fill up the 'Modes' array for each call to fill indices.
