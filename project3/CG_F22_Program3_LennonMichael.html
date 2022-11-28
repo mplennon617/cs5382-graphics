@@ -6,10 +6,14 @@
     precision mediump float;
 
     in  vec4 aPosition;
+    in  vec4 aNormal;
     in  vec4 aColor;
     out vec4 vColor;
 
     uniform vec3 uThetaView;
+
+    uniform vec4 uLightPosition;
+    uniform mat3 uNormalMatrix;
 
     uniform mat4 modelViewMatrix;
     uniform mat4 projectionMatrix;
@@ -55,7 +59,9 @@
 
         // Determine Vertex Color based on lighting.
 
-        vec3 pos = (uModelViewMatrix * aPosition).xyz;
+        vec3 N, L, E;
+
+        vec3 pos = (modelViewMatrix * aPosition).xyz;
         if(uLightPosition.z == 0.0)  
               L = normalize(uLightPosition.xyz);
         else  

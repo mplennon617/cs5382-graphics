@@ -53,18 +53,21 @@ let indices = []; // List of all indices.
 
 // Lighting constants.
 const lightPosition = vec4(1.0, 1.0, 1.0, 0.0);
-const lightAmbient = vec4(0.2, 0.2, 0.2, 1.0);
-const lightDiffuse = vec4(1.0, 1.0, 1.0, 1.0);
+const lightAmbient = vec4(0.8, 0.8, 0.8, 1.0);
+const lightDiffuse = vec4(0.2, 0.2, 0.2, 1.0);
 const lightSpecular = vec4(1.0, 1.0, 1.0, 1.0);
 
 const materialAmbient = vec4(1.0, 0.0, 1.0, 1.0);
-const materialDiffuse = vec4(1.0, 0.8, 0.0, 1.0);
+const materialDiffuse = vec4(1.0, 0.2, 1.0, 1.0);
 const materialSpecular = vec4(1.0, 1.0, 1.0, 1.0);
 const materialShininess = 20.0;
 
 // Other Constants.
 const numCirclePoints = 30; // Number of points used to construct each circle FIXME: This cannot be changed, unfortunately, due to other hardcoded constraints
 const NUM_CHAINS = 10; // Number of chains 'binding' the chain chomp to the origin.
+const NUM_CHAIN_POINTS = 30; // Number of points used to construct each circular XY cross section in each chain sphere.
+const NUM_HEAD_POINTS = 50; // Number of points used to construct each circular XY cross section in the head sphere.
+const NUM_MESH_POINTS = 20;
 const CHAIN_INDICES_LENGTH = 4641; // The number of elements in indices taken up by the chain sphere.
 const HEAD_INDICES_LENGTH = 12761 - 8; // The number of elements in indices taken up by the head sphere.
 const EYES_INDICES_LENGTH = 228; // The number of elements in indices taken up by the eye cylinder.
@@ -74,6 +77,8 @@ const LOOKING_DISTANCE = 0.5; // The distance that the eyes can translate relati
 const HEAD_SQUISH = 0.8; // The amount that the head "squishes" after performing a big jump.
 const MESH_SCALE = 0.3; // The amount of random variation in the Y direction for the 2D mesh.
 
+
+let test = 0;
 // ----------------------------------------------------------------------
 //                           Fill Functions
 // ----------------------------------------------------------------------
@@ -102,6 +107,7 @@ const fillVertices = (newVertices) => {
  * @param {Array} newNormals - The normals to add to the global array
  */
 const fillNormals = (newNormals) => {
+  console.log("Adding this newNormals vector:",[newNormals]);
   normals = normals.concat(newNormals); // #NewNormal
 };
 
@@ -159,8 +165,11 @@ const getCircleVertices = (
 ) => {
   // Adapted and modified from James' example in the class Slack.
   let points = [];
+
+  let cylinderVertexNormals = []; // FIXME: REMOVE WHEN WE GET EYES LIT CORRECTLY
   points.push(vec3(x, y, z));
-  fillNormals([0, 0, 1, 1]); // FIXME: REMOVE
+  cylinderVertexNormals.push(vec4(0, 0, 1, 0)); // FIXME: REMOVE WHEN WE GET EYES LIT CORRECTLY
+  console.log(++test);
   for (let i = 0; i <= numPoints; i++) {
     points.push(
       vec3(
@@ -169,8 +178,12 @@ const getCircleVertices = (
         z
       )
     );
-    fillNormals([0, 0, 1, 1]); // FIXME: REMOVE
+    cylinderVertexNormals.push(vec4(0, 0, 1, 0)); // FIXME: REMOVE WHEN WE GET EYES LIT CORRECTLY
+    console.log(++test);
   }
+
+  console.log(points.length + vertices.length, normals.length);
+  fillNormals(cylinderVertexNormals);
   return points;
 };
 
@@ -276,10 +289,15 @@ const getMeshVertexNormals = (verticesOffset, numMeshLinePoints) => {
     const currVerticesOffset = verticesOffset + i * numMeshLinePoints;
     for (let j = 0; j < numMeshLinePoints; j++) {
       let pC, pN, pE, pS, pW;
-      let hasN = (hasE = hasS = hasW = false);
+      let hasN, hasE, hasS, hasW;
+      hasE = hasS = hasW = false;
 
+      // Defining 4 surface reference points (along with center)
       pC = vertices[currVerticesOffset + j];
       if (i !== numMeshLinePoints - 1) {
+        // console.log("i:",i,"numMeshLinePoints:",numMeshLinePoints);
+        // console.log("Number of vertices total:",vertices.length);
+        // console.log("Sanity Check:",currVerticesOffset + j,currVerticesOffset + j + numMeshLinePoints);
         pN = vertices[currVerticesOffset + j + numMeshLinePoints];
         hasN = true;
       }
@@ -296,36 +314,40 @@ const getMeshVertexNormals = (verticesOffset, numMeshLinePoints) => {
         hasW = true;
       }
 
+      // Calculate normal vectors
       let normal = vec3(0, 0, 0);
 
-      if (hasN) {
+      if (hasN === true) {
+        // console.log("pN",pN,"pC",pC);
         const tN = subtract(pN, pC);
 
         // Northeast Normal
-        if (hasE) {
+        if (hasE === true) {
           const tE = subtract(pE, pC);
           const n1 = cross(tN, tE);
           normal = add(normal, n1);
         }
         // Northwest Normal
-        if (hasW) {
-          const tW = subtract(Pw, pC);
+        if (hasW === true) {
+          const tW = subtract(pW, pC);
           const n4 = cross(tN, tW);
           normal = add(normal, n4);
         }
       }
-      if (hasS) {
+      if (hasS === true) {
         const tS = subtract(pS, pC);
 
-        if (hasE) {
+        // Southeast Normal
+        if (hasE === true) {
           const tE = subtract(pE, pC);
           const n2 = cross(tS, tE);
           normal = add(normal, n2);
         }
-        if (hasW) {
-          const tW = subtract(Pw, pC);
+        // Southwest Normal (Yeehaw)
+        if (hasW === true) {
+          const tW = subtract(pW, pC);
           const n3 = cross(tS, tW);
-          normal = add(normal, n4);
+          normal = add(normal, n3);
         }
       }
 
@@ -392,10 +414,14 @@ const getSphereVertexNormals = (verticesOffset, numCirclePoints) => {
       // If we're at the bottom or top of the sphere, the normal will be straight down or straight up.
       if (i === 0 || i === numCirclePoints) {
         let dir = i === 0 ? -1 : 1;
-        points.push(vec3(0, 0, dir));
+        sphereVertexNormals.push(vec4(0, 0, dir, 0.0));
+        // console.log("--i",i,"j",j)
       }
       // Otherwise, calculate the average normal based on the 4 surfaces adjacent to the vertex.
       else {
+        // console.log("i",i,"j",j)
+        // console.log(vertices.length, currVerticesOffset + j + numCirclePoints)
+
         let pC = vertices[currVerticesOffset + j];
         let pN = vertices[currVerticesOffset + j + numCirclePoints];
         let pE = vertices[currVerticesOffset + j + 1];
@@ -410,7 +436,7 @@ const getSphereVertexNormals = (verticesOffset, numCirclePoints) => {
         const t1 = subtract(pN, pC);
         const t2 = subtract(pE, pC);
         const t3 = subtract(pS, pC);
-        const t4 = subtract(Pw, pC);
+        const t4 = subtract(pW, pC);
 
         const n1 = cross(t1, t2);
         const n2 = cross(t2, t3);
@@ -580,24 +606,34 @@ const range = (start, end) => {
  */
 const buildInstances = () => {
   // ***** Building the chains *****
-  let chainSphere = getSphereVertices(0, 0, 0, 0.4, 30);
+  let chainSphere = getSphereVertices(0, 0, 0, 0.4, NUM_CHAIN_POINTS);
   fillVertices(chainSphere);
   fillSphereColorGradient(
     vec4(1, 1, 1, 1.0),
     vec4(0.67, 0.67, 0.8, 1.0),
     chainSphere
   );
-  fillIndices(connectSphere(0, 30));
+  fillIndices(connectSphere(0, NUM_CHAIN_POINTS));
+  fillNormals(getSphereVertexNormals(0, NUM_CHAIN_POINTS));
+
+  console.log("Built chains");
+  console.log("Vertices length:",vertices.length);
+  console.log("Normals length:",normals.length);
 
   // ***** Building the head *****
-  let sphere1 = getSphereVertices(0, 0, 0, 3, 50);
+  let sphere1 = getSphereVertices(0, 0, 0, 3, NUM_HEAD_POINTS);
   fillVertices(sphere1);
   fillSphereColorGradient(
     vec4(0.27, 0.27, 0.4, 1.0),
     vec4(0, 0, 0, 1.0),
     sphere1
   );
-  fillIndices(connectSphere(931, 50));
+  fillIndices(connectSphere(930, NUM_HEAD_POINTS));
+  fillNormals(getSphereVertexNormals(930, NUM_HEAD_POINTS));
+
+  console.log("Built head");
+  console.log("Vertices length:",vertices.length);
+  console.log("Normals length:",normals.length);
 
   // ***** Building the eyes *****
   let eyeOffset = vertices.length;
@@ -610,10 +646,16 @@ const buildInstances = () => {
     getCircleVertices(0, 0, 0, 0.4, numCirclePoints),
     0.5
   );
+
+  console.log("A. Vertices length:",vertices.length);
+  console.log("A. Normals length:",normals.length);
+  console.log(eyeLg);
   fillVertices(eyeLg);
   fillColor(vec4(1, 1, 1, 1.0), eyeLg);
   fillVertices(eyeSm);
   fillColor(vec4(0.1, 0.1, 0.1, 1.0), eyeSm);
+  console.log("B. Vertices length:",vertices.length);
+  console.log("B. Normals length:",normals.length);
   // Parallel Circles
   fillIndices(range(currOffset, currOffset + eyeLg.length / 2 - 1));
   fillIndices(
@@ -629,17 +671,27 @@ const buildInstances = () => {
     connectParallelCylinders(eyeOffset + eyeSm.length + 1, numCirclePoints)
   );
 
+  console.log("Built eyes");
+  console.log("Vertices length:",vertices.length);
+  console.log("Normals length:",normals.length);
+
   // ***** Building the mesh *****
-  let mesh = getRandomMesh(20, 20);
+  let mesh = getRandomMesh(NUM_MESH_POINTS, NUM_MESH_POINTS);
   currOffset = vertices.length;
   fillVertices(mesh);
   fillColor(vec4(0, 0.6, 0.1, 1.0), mesh);
-  const meshIndices = connectMesh(currOffset, 20);
+  const meshIndices = connectMesh(currOffset, NUM_MESH_POINTS);
   fillIndices(meshIndices);
+  fillNormals(getMeshVertexNormals(currOffset, NUM_MESH_POINTS));
+
+  console.log("Built mesh");
+  console.log("Vertices length:",vertices.length);
+  console.log("Normals length:",normals.length);
 
   // Prepare colors, vertices, and indices to be fed into the graphics pipeline.
   colors = flatten(colors);
   vertices = flatten(vertices);
+  normals = flatten(normals);
   indices = new Uint16Array(indices);
 };
 
@@ -692,7 +744,7 @@ window.onload = () => {
   // Bind vertex normals (NORMALS) to the gl array buffer.
   var nBuffer = gl.createBuffer();
   gl.bindBuffer(gl.ARRAY_BUFFER, nBuffer);
-  gl.bufferData(gl.ARRAY_BUFFER, flatten(normals), gl.STATIC_DRAW);
+  gl.bufferData(gl.ARRAY_BUFFER, normals, gl.STATIC_DRAW);
 
   const normalLoc = gl.getAttribLocation(program, "aNormal");
   gl.vertexAttribPointer(normalLoc, 4, gl.FLOAT, false, 0, 0);
@@ -718,7 +770,6 @@ window.onload = () => {
   nMatrixLoc = gl.getUniformLocation(program, "uNormalMatrix");
 
   // Define Lighting constant uniforms.
-  const lightAmbient = mult(lightAmbient, materialAmbient);
   const diffuseProduct = mult(lightDiffuse, materialDiffuse);
   const specularProduct = mult(lightSpecular, materialSpecular);
 
