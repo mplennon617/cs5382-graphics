@@ -53,7 +53,6 @@ let colors = []; // List of all colors. An array of vec4s
 let vertices = []; // List of all vertices. An array of vec3s
 let normals = []; // List of all vertex normals. An array of vec3s
 let indices = []; // List of all indices.
-let texCoords = []; // List of all texture coordinates. An array of vec2s
 
 // Lighting and Texture constants.
 let lightPosition = vec4(1.0, 1.0, 1.0, 0.0);
@@ -61,11 +60,9 @@ let lightAmbient = vec4(0.8, 0.8, 0.8, 1.0);
 let lightDiffuse = vec4(0.2, 0.3, 0.2, 1.0); // NOTE: Green diffuse component is a little higher
 let lightSpecular = vec4(1.0, 1.0, 1.0, 1.0);
 
-const materialDiffuse = vec4(0.15, 0.15, 0.15, 1.0);
+const materialDiffuse = vec4(0.3, 0.3, 0.3, 1.0);
 const materialSpecular = vec4(0.8, 0.8, 0.8, 1.0);
 const materialShininess = 20.0;
-
-let texSize = 1024; // Size of the bump map image.
 
 // Other Constants.
 const numCirclePoints = 30; // Number of points used to construct each circle FIXME: This cannot be changed, unfortunately, due to other hardcoded constraints
@@ -104,14 +101,6 @@ const fillColor = (colorVec, vertices) => {
  */
 const fillVertices = (newVertices) => {
   vertices = vertices.concat(newVertices);
-};
-
-/**
- * Fills the global vertices array with the given vertices.
- * @param {Array} newNormals - The normals to add to the global array
- */
-const fillTexCoords = (newTexCoords) => {
-  texCoords = texCoords.concat(newTexCoords); // #NewNormal
 };
 
 /**
@@ -177,10 +166,10 @@ const getCircleVertices = (
   // Adapted and modified from James' example in the class Slack.
   let points = [];
 
-  let cylinderVertexNormals = []; // FIXME: REMOVE WHEN WE GET EYES LIT CORRECTLY
+  let cylinderVertexNormals = [];
   points.push(vec3(x, y, z));
-  cylinderVertexNormals.push(vec4(0, 0, 1, 0)); // FIXME: REMOVE WHEN WE GET EYES LIT CORRECTLY
-  cylinderVertexNormals.push(vec4(0, 0, 1, 0)); // FIXME: REMOVE WHEN WE GET EYES LIT CORRECTLY
+  cylinderVertexNormals.push(vec4(0, 0, 1, 0));
+  cylinderVertexNormals.push(vec4(0, 0, 1, 0));
   for (let i = 0; i <= numPoints; i++) {
     points.push(
       vec3(
@@ -189,8 +178,8 @@ const getCircleVertices = (
         z
       )
     );
-    cylinderVertexNormals.push(vec4(0, 0, 1, 0)); // FIXME: REMOVE WHEN WE GET EYES LIT CORRECTLY
-    cylinderVertexNormals.push(vec4(0, 0, 1, 0)); // FIXME: REMOVE WHEN WE GET EYES LIT CORRECTLY
+    cylinderVertexNormals.push(vec4(0, 0, 1, 0));
+    cylinderVertexNormals.push(vec4(0, 0, 1, 0));
   }
 
   fillNormals(cylinderVertexNormals);
@@ -228,29 +217,6 @@ const getSphereVertices = (
           z + radius * Math.cos(theta)
         )
       );
-    }
-  }
-  return points;
-};
-
-/**
- * Returns texture coordinates for a sphere.
- *
- * @param {float} x - X offset position.
- * @param {float} y - Y offset position.
- * @param {float} z - Z offset position.
- * @param {float} radius - radius of the sphere
- * @param {int} numPoints - Number of points used to draw the sphere.
- * @returns A Float32Array containing all the points of the sphere.
- */
-const getSphereTexCoords = (numCirclePoints = 50) => {
-  // Adapted and modified from demo at end of class on 10.19.22.
-  let points = [];
-  let count = 0;
-
-  for (let i = 0; i <= numCirclePoints; i++) {
-    for (let j = 0; j < numCirclePoints; j++) {
-      points.push(vec2(j / numCirclePoints, i / numCirclePoints));
     }
   }
   return points;
@@ -586,7 +552,6 @@ const buildInstances = () => {
   );
   fillIndices(connectSphere(0, NUM_CHAIN_POINTS));
   fillNormals(getSphereVertexNormals(0, NUM_CHAIN_POINTS));
-  fillTexCoords(getSphereTexCoords(NUM_CHAIN_POINTS));
   // ***** Building the head *****
   let sphere1 = getSphereVertices(0, 0, 0, 3, NUM_HEAD_POINTS);
   fillVertices(sphere1);
@@ -597,7 +562,6 @@ const buildInstances = () => {
   );
   fillIndices(connectSphere(930, NUM_HEAD_POINTS));
   fillNormals(getSphereVertexNormals(930, NUM_HEAD_POINTS));
-  fillTexCoords(getSphereTexCoords(NUM_HEAD_POINTS));
 
   // ***** Building the eyes *****
   let eyeOffset = vertices.length;
@@ -647,104 +611,6 @@ const buildInstances = () => {
 };
 
 // -----------------------------------------------------------------------------------------------
-//                                 Image and Texture Configuration
-// -----------------------------------------------------------------------------------------------
-
-/**
- * Function for configuring the 1024x1024 bump map texture.
- * @param {*} image - the image to configure.
- */
-const configureTexture = (image) => {
-  console.log("configuring texture with image",image);
-  let texture = gl.createTexture();
-  gl.activeTexture(gl.TEXTURE0);
-  gl.bindTexture(gl.TEXTURE_2D, texture);
-  gl.texImage2D(
-    gl.TEXTURE_2D,
-    0,
-    gl.RGB,
-    texSize,
-    texSize,
-    0,
-    gl.RGB,
-    gl.UNSIGNED_BYTE,
-    image
-  );
-  gl.generateMipmap(gl.TEXTURE_2D);
-};
-
-// TODO: Use https://webgl2fundamentals.org/webgl/lessons/webgl-image-processing.html
-const textureMapping = () => {
-  let resultImage = new Image();
-  resultImage.src = "MetalBumpMap.jpg"; // MUST BE SAME DOMAIN!!!
-  resultImage.onload = () => {
-    // *****onLoad code adopted from Hello2DTexture_ImageFileReader.js
-    let canvas = document.createElement("canvas");
-    let ctx = canvas.getContext("2d");
-
-    texSize = resultImage.width; // Rendundant, but forces texSize variable to adjust if a different image is used
-    // Render the loaded image to the canvas
-    ctx.drawImage(resultImage, 0, 0, resultImage.width, resultImage.height);
-    // Get the image rendered to the canvas, returns a Uint8ClampedArray
-    let imageData = ctx.getImageData(
-      0,
-      0,
-      resultImage.width,
-      resultImage.height
-    ); // FIXME: Why is most of the data 0?
-    console.log(imageData.width, imageData.height);
-    console.log(imageData);
-
-    // Convert to Array for modification
-    let image = new Array(resultImage.width * resultImage.height * 4);
-    for (let i = 0; i < resultImage.width * resultImage.height * 4; i++)
-      image[i] = imageData.data[i];
-
-    // Normalize Data to [0,1]
-    let normalizedData = image.map((x) => x / 255.0);
-    console.log("normalizedData", normalizedData);
-
-    // Bump Map Normals (Adopted from bumpMap.js)
-    // Note conversion from 1D Array to 2D Array
-    let normalst = new Array();
-    for (let i = 0; i < texSize; i++) normalst[i] = new Array();
-    for (let i = 0; i < texSize; i++)
-      for (let j = 0; j < texSize; j++) normalst[i][j] = new Array();
-    for (let i = 0; i < texSize; i++)
-      for (let j = 0; j < texSize; j++) {
-        normalst[i][j][0] = normalizedData[i*texSize+j] - normalizedData[(i+1)*texSize+j];
-        normalst[i][j][1] = normalizedData[i*texSize+j] - normalizedData[i*texSize+j+1];
-        normalst[i][j][2] = 1;
-      }
-      console.log("normalst:",normalst);
-
-    // Scale to Texture Coordinates (Adopted from bumpMap.js)
-
-    for (let i = 0; i < texSize; i++)
-      for (let j = 0; j < texSize; j++) {
-        let d = 0;
-        for (let k = 0; k < 3; k++) d += normalst[i][j][k] * normalst[i][j][k];
-        d = Math.sqrt(d);
-        for (let k = 0; k < 3; k++)
-          normalst[i][j][k] = (0.5 * normalst[i][j][k]) / d + 0.5;
-      }
-      console.log("normalst scaled:",normalst);
-
-    // Normal Texture Array (Adopted from bumpMap.js)
-    let normals = new Uint8Array(3 * texSize * texSize);
-
-    for (let i = 0; i < texSize; i++)
-      for (let j = 0; j < texSize; j++)
-        for (let k = 0; k < 3; k++)
-          normals[3 * texSize * i + 3 * j + k] = 255 * normalst[i][j][k];
-    console.log("normals:",normals);
-
-    // Configure the bump map texture with the resulting normal texture array.
-    configureTexture(normals);
-  };
-};
-
-// -----------------------------------------------------------------------------------------------
 //                                  GL program and Shader Setup
 // -----------------------------------------------------------------------------------------------
 
@@ -778,15 +644,6 @@ const bindBuffers = () => {
   const normalLoc = gl.getAttribLocation(program, "aNormal");
   gl.vertexAttribPointer(normalLoc, 4, gl.FLOAT, false, 0, 0);
   gl.enableVertexAttribArray(normalLoc);
-
-  // Bind Texture (TEXCOORDS) to the gl array buffer.
-  let tBuffer = gl.createBuffer();
-  gl.bindBuffer(gl.ARRAY_BUFFER, tBuffer);
-  gl.bufferData(gl.ARRAY_BUFFER, flatten(texCoords), gl.STATIC_DRAW);
-
-  let texCoordLoc = gl.getAttribLocation(program, "aTexCoord");
-  gl.vertexAttribPointer(texCoordLoc, 2, gl.FLOAT, false, 0, 0);
-  gl.enableVertexAttribArray(texCoordLoc);
 
   // Bind topology (INDICES) to the gl element array buffer.
   let iBuffer = gl.createBuffer();
@@ -956,9 +813,6 @@ window.onload = () => {
 
   // Define uniforms for lighting and model transformation.
   defineConstantUniforms();
-
-  // Setup the bumpmap texture.
-  textureMapping();
 
   // Setup slider behavior on the UI.
   setupSliders();
