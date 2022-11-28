@@ -679,6 +679,7 @@ const configureTexture = image => {
   gl.generateMipmap(gl.TEXTURE_2D);
 }
 
+// TODO: Use https://webgl2fundamentals.org/webgl/lessons/webgl-image-processing.html
 const configureImage = () => {
   let image = new Image();
   image.src = "MetalBumpMap.jpg";  // MUST BE SAME DOMAIN!!!
