@@ -21,14 +21,15 @@ let projectionMatrix;
 let nMatrix;
 
 // Values set by sliders and render ticks.
-let thetaView = [0.0, 0.0, 0.0]; // Rotation angles for x, y and z axes
-let slideVals = [0, 0, 0, 0, 0]; // Values for all user-controlled sliders
+let thetaView = [0.0, 4, 0.0]; // Rotation angles for x, y and z axes
+let figureSliderVals = [0, 0, 0, 0, 0]; // Values for all user-controlled sliders
+let scaleSliderVal = 1;
 let toggleRot = true; // Toggle Rotation Control
 let dir = false; // Toggle Rotation Direction
 let freeze = false; // Toggle Freeze effect (Chain chomp stops jumping)
 let bigJumpState = false; // Toggle state -- is the Chomp performing a big jump?
 
-// Enum - Indices for all slider values. Used to index slideVals
+// Enum - Indices for all slider values. Used to index figureSliderVals
 const Base = 0;
 const HeadZ = 1;
 const HeadY = 2;
@@ -50,17 +51,20 @@ let colors = []; // List of all colors. An array of vec4s
 let vertices = []; // List of all vertices. An array of vec3s
 let normals = []; // List of all vertex normals. An array of vec3s
 let indices = []; // List of all indices.
+let texCoords = []; // List of all texture coordinates. An array of vec2s
 
-// Lighting constants.
+// Lighting and Texture constants.
 const lightPosition = vec4(1.0, 1.0, 1.0, 0.0);
 const lightAmbient = vec4(0.8, 0.8, 0.8, 1.0);
 const lightDiffuse = vec4(0.2, 0.3, 0.2, 1.0);
 const lightSpecular = vec4(1.0, 1.0, 1.0, 1.0);
 
 const materialAmbient = vec4(1.0, 0.0, 1.0, 1.0);
-const materialDiffuse = vec4(0.5, 0.5, 0.5, 1.0);
-const materialSpecular = vec4(0.5, 0.5, 0.5, 1.0);
+const materialDiffuse = vec4(0.15, 0.15, 0.15, 1.0);
+const materialSpecular = vec4(0.8, 0.8, 0.8, 1.0);
 const materialShininess = 20.0;
+
+const texSize = 1024; // Size of the bump map image.
 
 // Other Constants.
 const numCirclePoints = 30; // Number of points used to construct each circle FIXME: This cannot be changed, unfortunately, due to other hardcoded constraints
@@ -99,6 +103,14 @@ const fillColor = (colorVec, vertices) => {
  */
 const fillVertices = (newVertices) => {
   vertices = vertices.concat(newVertices);
+};
+
+/**
+ * Fills the global vertices array with the given vertices.
+ * @param {Array} newNormals - The normals to add to the global array
+ */
+ const fillTexCoords = (newTexCoords) => {
+  texCoords = texCoords.concat(newTexCoords); // #NewNormal
 };
 
 /**
@@ -221,6 +233,39 @@ const getSphereVertices = (
 };
 
 /**
+ * Returns texture coordinates for a sphere.
+ *
+ * @param {float} x - X offset position.
+ * @param {float} y - Y offset position.
+ * @param {float} z - Z offset position.
+ * @param {float} radius - radius of the sphere
+ * @param {int} numPoints - Number of points used to draw the sphere.
+ * @returns A Float32Array containing all the points of the sphere.
+ */
+ const getSphereTexCoords = (
+  x = 0.0,
+  y = 0.0,
+  z = 0.0,
+  radius = 1.0,
+  numCirclePoints = 50
+) => {
+  // Adapted and modified from demo at end of class on 10.19.22.
+  let points = [];
+
+  for (let i = 0; i <= numCirclePoints; i++) {
+    for (let j = 0; j < numCirclePoints; j++) {
+      points.push(
+        vec2(
+          j / numCirclePoints,
+          i / numCirclePoints
+        )
+      );
+    }
+  }
+  return points;
+};
+
+/**
  * Duplicates a shape, defining vertices for a new shape. Effectively creates two parallel shapes.
  *
  * @param {Array} shape - Array of vec3s containing the shape to duplicate.
@@ -266,15 +311,6 @@ const getRandomMesh = (sideLength = 1.0, numMeshLinePoints = 20) => {
           MESH_SCALE * (2 * Math.random() - 1),
           j * (sideLength / numMeshLinePoints) - sideLength / 2
         )
-      );
-      console.log(
-        firstIdx + i * numMeshLinePoints + j,
-        "Added new point: " +
-          vec3(
-            i * (sideLength / numMeshLinePoints) - sideLength / 2,
-            MESH_SCALE * (2 * Math.random() - 1),
-            j * (sideLength / numMeshLinePoints) - sideLength / 2
-          )
       );
     }
   }
@@ -509,7 +545,6 @@ const connectMesh = (verticesOffset, numMeshLinePoints) => {
       1;
     i += numMeshLinePoints
   ) {
-    console.log("Connect Mesh - NEW ROW");
 
     for (let j = i; j < i + numMeshLinePoints - 1; j++) {
       {
@@ -520,15 +555,6 @@ const connectMesh = (verticesOffset, numMeshLinePoints) => {
           j + numMeshLinePoints,
           65535,
         ]);
-        // console.log(count++);
-        console.log(
-          "New connection:",
-          j,
-          j + 1,
-          j + numMeshLinePoints + 1,
-          j + numMeshLinePoints,
-          65535
-        );
       }
     }
   }
@@ -645,6 +671,67 @@ const buildInstances = () => {
 // ----------------------------------------------------------------------
 
 /**
+ * Function for configuring the 1024x1024 bump map texture.
+ * @param {*} image - the image to configure.
+ */
+function configureTexture( image ) {
+  var texture = gl.createTexture();
+  gl.activeTexture(gl.TEXTURE0);
+  gl.bindTexture(gl.TEXTURE_2D, texture);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, texSize, texSize, 0, gl.RGB, gl.UNSIGNED_BYTE, image);
+  gl.generateMipmap(gl.TEXTURE_2D);
+}
+
+const setupSliders = () => {
+    // Define javascript events for the HTML elements used to manipulate the scene.
+    document.getElementById("ButtonC").onclick = () => {
+      dir = !dir;
+    };
+    document.getElementById("ButtonT").onclick = () => {
+      toggleRot = !toggleRot;
+    };
+    document.getElementById("ButtonR").onclick = () => {
+      figureSliderVals = [0, 0, 0, 0, 0];
+    };
+    document.getElementById("ButtonF").onclick = () => {
+      freeze = !freeze;
+    };
+    document.getElementById("ButtonJ").onclick = () => {
+      freeze = false;
+      bigJumpState = 3;
+    };
+  
+    document.getElementById("cSlide").onchange = () => {
+      figureSliderVals[Base] = event.srcElement.value;
+    };
+    document.getElementById("hxSlide").onchange = () => {
+      figureSliderVals[HeadZ] = event.srcElement.value;
+    };
+    document.getElementById("hySlide").onchange = () => {
+      figureSliderVals[HeadY] = event.srcElement.value;
+    };
+    document.getElementById("exSlide").onchange = () => {
+      figureSliderVals[EyesX] = event.srcElement.value;
+    };
+    document.getElementById("eySlide").onchange = () => {
+      figureSliderVals[EyesY] = event.srcElement.value;
+    };
+  
+    document.getElementById("rotXSlider").onchange = () => {
+      thetaView[0] = event.srcElement.value;
+    };
+    document.getElementById("rotYSlider").onchange = () => {
+      thetaView[1] = event.srcElement.value;
+    };
+    document.getElementById("rotZSlider").onchange = () => {
+      thetaView[2] = event.srcElement.value;
+    };
+    document.getElementById("scaleSlider").onchange = () => {
+      scaleSliderVal = event.srcElement.value;
+    };
+}
+
+/**
  * Intializes shaders and bufferData.
  */
 window.onload = () => {
@@ -695,6 +782,15 @@ window.onload = () => {
   gl.vertexAttribPointer(normalLoc, 4, gl.FLOAT, false, 0, 0);
   gl.enableVertexAttribArray(normalLoc);
 
+  // Bind Texture (TEXCOORDS) to the gl array buffer. TODO: Readd
+  // var tBuffer = gl.createBuffer();
+  // gl.bindBuffer( gl.ARRAY_BUFFER, tBuffer);
+  // gl.bufferData( gl.ARRAY_BUFFER, flatten(texCoords), gl.STATIC_DRAW);
+
+  var texCoordLoc = gl.getAttribLocation( program, "aTexCoord");
+  gl.vertexAttribPointer( texCoordLoc, 2, gl.FLOAT, false, 0, 0);
+  gl.enableVertexAttribArray(texCoordLoc);
+
   // Bind topology (INDICES) to the gl element array buffer.
   let iBuffer = gl.createBuffer();
   gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, iBuffer);
@@ -736,39 +832,8 @@ window.onload = () => {
   );
   gl.uniform1f(gl.getUniformLocation(program, "uShininess"), materialShininess);
 
-  // Define javascript events for the HTML elements used to manipulate the scene.
-  document.getElementById("ButtonC").onclick = () => {
-    dir = !dir;
-  };
-  document.getElementById("ButtonT").onclick = () => {
-    toggleRot = !toggleRot;
-  };
-  document.getElementById("ButtonR").onclick = () => {
-    slideVals = [0, 0, 0, 0, 0];
-  };
-  document.getElementById("ButtonF").onclick = () => {
-    freeze = !freeze;
-  };
-  document.getElementById("ButtonJ").onclick = () => {
-    freeze = false;
-    bigJumpState = 3;
-  };
-
-  document.getElementById("cSlide").onchange = () => {
-    slideVals[Base] = event.srcElement.value;
-  };
-  document.getElementById("hxSlide").onchange = () => {
-    slideVals[HeadZ] = event.srcElement.value;
-  };
-  document.getElementById("hySlide").onchange = () => {
-    slideVals[HeadY] = event.srcElement.value;
-  };
-  document.getElementById("exSlide").onchange = () => {
-    slideVals[EyesX] = event.srcElement.value;
-  };
-  document.getElementById("eySlide").onchange = () => {
-    slideVals[EyesY] = event.srcElement.value;
-  };
+  // Setup slider behavior on the UI.
+  setupSliders();
 
   // Begin continuous rendering of the scene.
   render();
@@ -782,7 +847,9 @@ window.onload = () => {
  * Function to draw the 2D mesh.
  */
 const mesh = () => {
-  const t = mult(rotateZ(-8), mult(scale(15, 1, 1), translate(10, -1.6, 0)));
+  const instanceMatrix = mult(rotateZ(-8), mult(scale(15, 1, 1), translate(10, -1.6, 0)));
+  const t = mult(modelViewMatrix, instanceMatrix);
+
   nMatrix = normalMatrix(t, true);
 
   gl.uniformMatrix4fv(modelViewMatrixLoc, false, flatten(t));
@@ -1020,10 +1087,13 @@ const render = () => {
 
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
+  // Scene Scaler
+  modelViewMatrix = scale(1, scaleSliderVal, 1);
+
   // ***** Draw each part of the figure, manipulating the model View matrix as we go. *****
   mesh();
 
-  modelViewMatrix = rotate(slideVals[Base], vec3(0, 1, 0));
+  modelViewMatrix = mult(modelViewMatrix, rotate(figureSliderVals[Base], vec3(0, 1, 0)));
   base(t);
 
   gl.uniform3fv(thetaViewLoc, thetaView); // Update uniform in vertex shader with new rotation angle
@@ -1034,21 +1104,21 @@ const render = () => {
   );
   modelViewMatrix = mult(
     modelViewMatrix,
-    rotate(slideVals[HeadZ], vec3(0, 0, 1))
+    rotate(figureSliderVals[HeadZ], vec3(0, 0, 1))
   );
   modelViewMatrix = mult(
     modelViewMatrix,
-    rotate(slideVals[HeadY], vec3(0, 1, 0))
+    rotate(figureSliderVals[HeadY], vec3(0, 1, 0))
   );
   head(t);
 
   modelViewMatrix = mult(
     modelViewMatrix,
-    translate(0, 0, slideVals[EyesX] * LOOKING_DISTANCE)
+    translate(0, 0, figureSliderVals[EyesX] * LOOKING_DISTANCE)
   );
   modelViewMatrix = mult(
     modelViewMatrix,
-    translate(0, slideVals[EyesY] * LOOKING_DISTANCE, 0)
+    translate(0, figureSliderVals[EyesY] * LOOKING_DISTANCE, 0)
   );
   eyes(t);
 
@@ -1081,9 +1151,10 @@ const render = () => {
 
     if (toggleRot) {
       if (dir) {
-        thetaView[axis] += 0.017 * speedMultiplier; // Increment rotation of currently active axis of rotation in radians
+        // FIXME: Uncomment
+        // thetaView[axis] += 0.017 * speedMultiplier; // Increment rotation of currently active axis of rotation in radians
       } else {
-        thetaView[axis] -= 0.017 * speedMultiplier;
+        // thetaView[axis] -= 0.017 * speedMultiplier;
       }
     }
   }
