@@ -23,11 +23,13 @@ let nMatrix;
 // Values set by sliders and render ticks.
 let thetaView = [0.0, 4, 0.0]; // Rotation angles for x, y and z axes
 let figureSliderVals = [0, 0, 0, 0, 0]; // Values for all user-controlled sliders
+let lightSliderVals = [1,1,1];
 let scaleSliderVal = 1;
 let toggleRot = true; // Toggle Rotation Control
 let dir = false; // Toggle Rotation Direction
 let freeze = false; // Toggle Freeze effect (Chain chomp stops jumping)
 let bigJumpState = false; // Toggle state -- is the Chomp performing a big jump?
+let brightness = 0.8;
 
 // Enum - Indices for all slider values. Used to index figureSliderVals
 const Base = 0;
@@ -54,12 +56,11 @@ let indices = []; // List of all indices.
 let texCoords = []; // List of all texture coordinates. An array of vec2s
 
 // Lighting and Texture constants.
-const lightPosition = vec4(1.0, 1.0, 1.0, 0.0);
-const lightAmbient = vec4(0.8, 0.8, 0.8, 1.0);
-const lightDiffuse = vec4(0.2, 0.3, 0.2, 1.0);
-const lightSpecular = vec4(1.0, 1.0, 1.0, 1.0);
+let lightPosition = vec4(1.0, 1.0, 1.0, 0.0);
+let lightAmbient = vec4(0.8, 0.8, 0.8, 1.0);
+let lightDiffuse = vec4(0.2, 0.3, 0.2, 1.0);  // NOTE: Green diffuse component is a little higher
+let lightSpecular = vec4(1.0, 1.0, 1.0, 1.0);
 
-const materialAmbient = vec4(1.0, 0.0, 1.0, 1.0);
 const materialDiffuse = vec4(0.15, 0.15, 0.15, 1.0);
 const materialSpecular = vec4(0.8, 0.8, 0.8, 1.0);
 const materialShininess = 20.0;
@@ -684,12 +685,8 @@ function configureTexture( image ) {
 
 const setupSliders = () => {
     // Define javascript events for the HTML elements used to manipulate the scene.
-    document.getElementById("ButtonC").onclick = () => {
-      dir = !dir;
-    };
-    document.getElementById("ButtonT").onclick = () => {
-      toggleRot = !toggleRot;
-    };
+
+    // *****  Reset, Freeze, and Big Jump (From Program 2) *****
     document.getElementById("ButtonR").onclick = () => {
       figureSliderVals = [0, 0, 0, 0, 0];
     };
@@ -700,7 +697,50 @@ const setupSliders = () => {
       freeze = false;
       bigJumpState = 3;
     };
+
+    // ***** Lighting manipulation ***** 
+    document.getElementById("ButtonB").onclick = () => {
+      brightness += 0.1;
+      lightAmbient = vec4(brightness, brightness, brightness, 1.0);
+      gl.uniform4fv(
+        gl.getUniformLocation(program, "uLightAmbient"),
+        flatten(lightAmbient)
+      );
+    };
+    document.getElementById("ButtonD").onclick = () => {
+      brightness -= 0.1;
+      lightAmbient = vec4(brightness, brightness, brightness, 1.0);
+      gl.uniform4fv(
+        gl.getUniformLocation(program, "uLightAmbient"),
+        flatten(lightAmbient)
+      );
+    };
+    document.getElementById("lightXSlider").onchange = () => {
+      lightSliderVals[0] = event.srcElement.value;
+      lightPosition = [...lightSliderVals, 0.0];
+      gl.uniform4fv(
+        gl.getUniformLocation(program, "uLightPosition"),
+        lightPosition
+      );
+    };
+    document.getElementById("lightYSlider").onchange = () => {
+      lightSliderVals[1] = event.srcElement.value;
+      lightPosition = [...lightSliderVals, 0.0];
+      gl.uniform4fv(
+        gl.getUniformLocation(program, "uLightPosition"),
+        lightPosition
+      );
+    };
+    document.getElementById("lightZSlider").onchange = () => {
+      lightSliderVals[2] = event.srcElement.value;
+      lightPosition = [...lightSliderVals, 0.0];
+      gl.uniform4fv(
+        gl.getUniformLocation(program, "uLightPosition"),
+        lightPosition
+      );
+    };
   
+    // ***** Scene Rotation ***** 
     document.getElementById("cSlide").onchange = () => {
       figureSliderVals[Base] = event.srcElement.value;
     };
@@ -717,6 +757,7 @@ const setupSliders = () => {
       figureSliderVals[EyesY] = event.srcElement.value;
     };
   
+    // ***** Articulated figure manipulation *****
     document.getElementById("rotXSlider").onchange = () => {
       thetaView[0] = event.srcElement.value;
     };
@@ -1124,20 +1165,6 @@ const render = () => {
 
   // ***** Advance time and adjust movement based on user input. *****
   // Speed
-  let el = document.querySelector("#speedselector");
-  let speedString = el.options[el.selectedIndex].text;
-  let speedMultiplier = 1;
-  switch (speedString) {
-    case "Slow":
-      speedMultiplier = 0.5;
-      break;
-    case "Normal":
-      speedMultiplier = 1;
-      break;
-    case "Fast":
-      speedMultiplier = 1.5;
-      break;
-  }
 
   // Advance time and rotate view
   if (freeze === false) {
@@ -1148,15 +1175,6 @@ const render = () => {
     }
 
     t = t + 0.01;
-
-    if (toggleRot) {
-      if (dir) {
-        // FIXME: Uncomment
-        // thetaView[axis] += 0.017 * speedMultiplier; // Increment rotation of currently active axis of rotation in radians
-      } else {
-        // thetaView[axis] -= 0.017 * speedMultiplier;
-      }
-    }
   }
 
   requestAnimationFrame(render); // Call to browser to refresh display
