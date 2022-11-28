@@ -54,12 +54,12 @@ let indices = []; // List of all indices.
 // Lighting constants.
 const lightPosition = vec4(1.0, 1.0, 1.0, 0.0);
 const lightAmbient = vec4(0.8, 0.8, 0.8, 1.0);
-const lightDiffuse = vec4(0.2, 0.2, 0.2, 1.0);
+const lightDiffuse = vec4(0.2, 0.3, 0.2, 1.0);
 const lightSpecular = vec4(1.0, 1.0, 1.0, 1.0);
 
 const materialAmbient = vec4(1.0, 0.0, 1.0, 1.0);
-const materialDiffuse = vec4(1.0, 0.2, 1.0, 1.0);
-const materialSpecular = vec4(1.0, 1.0, 1.0, 1.0);
+const materialDiffuse = vec4(0.5, 0.5, 0.5, 1.0);
+const materialSpecular = vec4(0.5, 0.5, 0.5, 1.0);
 const materialShininess = 20.0;
 
 // Other Constants.
@@ -76,7 +76,6 @@ const CHAIN_SPEED = 8; // The speed at which the chain chomp bounces up and down
 const LOOKING_DISTANCE = 0.5; // The distance that the eyes can translate relative to the center of the head.
 const HEAD_SQUISH = 0.8; // The amount that the head "squishes" after performing a big jump.
 const MESH_SCALE = 0.3; // The amount of random variation in the Y direction for the 2D mesh.
-
 
 let test = 0;
 // ----------------------------------------------------------------------
@@ -107,7 +106,6 @@ const fillVertices = (newVertices) => {
  * @param {Array} newNormals - The normals to add to the global array
  */
 const fillNormals = (newNormals) => {
-  console.log("Adding this newNormals vector:",[newNormals]);
   normals = normals.concat(newNormals); // #NewNormal
 };
 
@@ -169,7 +167,7 @@ const getCircleVertices = (
   let cylinderVertexNormals = []; // FIXME: REMOVE WHEN WE GET EYES LIT CORRECTLY
   points.push(vec3(x, y, z));
   cylinderVertexNormals.push(vec4(0, 0, 1, 0)); // FIXME: REMOVE WHEN WE GET EYES LIT CORRECTLY
-  console.log(++test);
+  cylinderVertexNormals.push(vec4(0, 0, 1, 0)); // FIXME: REMOVE WHEN WE GET EYES LIT CORRECTLY
   for (let i = 0; i <= numPoints; i++) {
     points.push(
       vec3(
@@ -179,10 +177,9 @@ const getCircleVertices = (
       )
     );
     cylinderVertexNormals.push(vec4(0, 0, 1, 0)); // FIXME: REMOVE WHEN WE GET EYES LIT CORRECTLY
-    console.log(++test);
+    cylinderVertexNormals.push(vec4(0, 0, 1, 0)); // FIXME: REMOVE WHEN WE GET EYES LIT CORRECTLY
   }
 
-  console.log(points.length + vertices.length, normals.length);
   fillNormals(cylinderVertexNormals);
   return points;
 };
@@ -257,6 +254,7 @@ const getParallelVertices = (shape, len = 1, dir = "z") => {
  * @returns A list of points representing a 2D square mesh.
  */
 const getRandomMesh = (sideLength = 1.0, numMeshLinePoints = 20) => {
+  const firstIdx = vertices.length;
   // Adapted and modified from demo at end of class on 10.19.22.
   let points = [];
 
@@ -268,6 +266,15 @@ const getRandomMesh = (sideLength = 1.0, numMeshLinePoints = 20) => {
           MESH_SCALE * (2 * Math.random() - 1),
           j * (sideLength / numMeshLinePoints) - sideLength / 2
         )
+      );
+      console.log(
+        firstIdx + i * numMeshLinePoints + j,
+        "Added new point: " +
+          vec3(
+            i * (sideLength / numMeshLinePoints) - sideLength / 2,
+            MESH_SCALE * (2 * Math.random() - 1),
+            j * (sideLength / numMeshLinePoints) - sideLength / 2
+          )
       );
     }
   }
@@ -295,9 +302,6 @@ const getMeshVertexNormals = (verticesOffset, numMeshLinePoints) => {
       // Defining 4 surface reference points (along with center)
       pC = vertices[currVerticesOffset + j];
       if (i !== numMeshLinePoints - 1) {
-        // console.log("i:",i,"numMeshLinePoints:",numMeshLinePoints);
-        // console.log("Number of vertices total:",vertices.length);
-        // console.log("Sanity Check:",currVerticesOffset + j,currVerticesOffset + j + numMeshLinePoints);
         pN = vertices[currVerticesOffset + j + numMeshLinePoints];
         hasN = true;
       }
@@ -318,7 +322,6 @@ const getMeshVertexNormals = (verticesOffset, numMeshLinePoints) => {
       let normal = vec3(0, 0, 0);
 
       if (hasN === true) {
-        // console.log("pN",pN,"pC",pC);
         const tN = subtract(pN, pC);
 
         // Northeast Normal
@@ -415,13 +418,9 @@ const getSphereVertexNormals = (verticesOffset, numCirclePoints) => {
       if (i === 0 || i === numCirclePoints) {
         let dir = i === 0 ? -1 : 1;
         sphereVertexNormals.push(vec4(0, 0, dir, 0.0));
-        // console.log("--i",i,"j",j)
       }
       // Otherwise, calculate the average normal based on the 4 surfaces adjacent to the vertex.
       else {
-        // console.log("i",i,"j",j)
-        // console.log(vertices.length, currVerticesOffset + j + numCirclePoints)
-
         let pC = vertices[currVerticesOffset + j];
         let pN = vertices[currVerticesOffset + j + numCirclePoints];
         let pE = vertices[currVerticesOffset + j + 1];
@@ -479,7 +478,7 @@ const connectParallelCylinders = (verticesOffset, numPoints) => {
   return indices;
 };
 
-// FIXME: Implement lighting for spheres
+// FIXME: Implement lighting for cylinders
 /**
  * Utility function for returning the indices used to connect all the points in a Cyl.
  * Pre: Vertices were created using getParallelVertices on a circle.
@@ -488,55 +487,7 @@ const connectParallelCylinders = (verticesOffset, numPoints) => {
  * @param {int} numPoints - number of points for each circle (2D cross section).
  * @returns the modified indices array.
  */
-const getCylinderVertexNormals = (verticesOffset, numCirclePoints) => {
-  // let cylVertexNormals = [];
-  // let circle2Idx = numPoints + 1;
-  // // Bottom of the circle
-  // points.push(vec3(x, y, z));
-  // for (let i = 0; i <= numPoints; i++) {
-  //   points.push(
-  //     vec3(
-  //       radius * Math.cos((i * 2 * Math.PI) / numPoints) + x,
-  //       radius * Math.sin((i * 2 * Math.PI) / numPoints) + y,
-  //       z
-  //     )
-  //   );
-  // }
-  // // Top of the circle
-  // points.push(vec3(x, y, z));
-  // for (let i = 0; i <= numPoints; i++) {
-  //   points.push(
-  //     vec3(
-  //       radius * Math.cos((i * 2 * Math.PI) / numPoints) + x,
-  //       radius * Math.sin((i * 2 * Math.PI) / numPoints) + y,
-  //       z
-  //     )
-  //   );
-  // }
-  // for (let i = verticesOffset; i <= verticesOffset + numPoints; i++) {
-  //   let pC = vertices[currVerticesOffset + j];
-  //   let pN = vertices[currVerticesOffset + j + numCirclePoints];
-  //   let pE = vertices[currVerticesOffset + j + 1];
-  //   let pS = vertices[currVerticesOffset + j - numCirclePoints];
-  //   let pW; // TODO: Check if this calculation is correct
-  //   if (j === 0) {
-  //     pW = vertices[currVerticesOffset + j + numCirclePoints - 1];
-  //   } else {
-  //     pW = vertices[currVerticesOffset + j - 1];
-  //   }
-  //   const t1 = subtract(pN, pC);
-  //   const t2 = subtract(pE, pC);
-  //   const t3 = subtract(pS, pC);
-  //   const t4 = subtract(Pw, pC);
-  //   const n1 = normalize(cross(t1, t2));
-  //   const n2 = normalize(cross(t2, t3));
-  //   const n3 = normalize(cross(t3, t4));
-  //   const n4 = normalize(cross(t4, t1));
-  //   const normal = add(add(add(n1, n2), n3), n4);
-  //   sphereVertexNormals.push(vec4(normal[0], normal[1], normal[2], 0.0));
-  // }
-  // return cylVertexNormals;
-};
+const getCylinderVertexNormals = (verticesOffset, numCirclePoints) => {};
 
 /**
  * Utility function for returing the indices used to connect a 2D square mesh.
@@ -548,11 +499,18 @@ const getCylinderVertexNormals = (verticesOffset, numCirclePoints) => {
 const connectMesh = (verticesOffset, numMeshLinePoints) => {
   let indices = [];
   let count = 0;
+
   for (
     let i = verticesOffset;
-    i < verticesOffset + numMeshLinePoints - 1;
-    i++
+    i <
+    verticesOffset +
+      numMeshLinePoints * numMeshLinePoints -
+      numMeshLinePoints -
+      1;
+    i += numMeshLinePoints
   ) {
+    console.log("Connect Mesh - NEW ROW");
+
     for (let j = i; j < i + numMeshLinePoints - 1; j++) {
       {
         indices = indices.concat([
@@ -562,8 +520,16 @@ const connectMesh = (verticesOffset, numMeshLinePoints) => {
           j + numMeshLinePoints,
           65535,
         ]);
+        // console.log(count++);
+        console.log(
+          "New connection:",
+          j,
+          j + 1,
+          j + numMeshLinePoints + 1,
+          j + numMeshLinePoints,
+          65535
+        );
       }
-      // console.log(count++);
     }
   }
 
@@ -616,10 +582,6 @@ const buildInstances = () => {
   fillIndices(connectSphere(0, NUM_CHAIN_POINTS));
   fillNormals(getSphereVertexNormals(0, NUM_CHAIN_POINTS));
 
-  console.log("Built chains");
-  console.log("Vertices length:",vertices.length);
-  console.log("Normals length:",normals.length);
-
   // ***** Building the head *****
   let sphere1 = getSphereVertices(0, 0, 0, 3, NUM_HEAD_POINTS);
   fillVertices(sphere1);
@@ -630,10 +592,6 @@ const buildInstances = () => {
   );
   fillIndices(connectSphere(930, NUM_HEAD_POINTS));
   fillNormals(getSphereVertexNormals(930, NUM_HEAD_POINTS));
-
-  console.log("Built head");
-  console.log("Vertices length:",vertices.length);
-  console.log("Normals length:",normals.length);
 
   // ***** Building the eyes *****
   let eyeOffset = vertices.length;
@@ -647,15 +605,10 @@ const buildInstances = () => {
     0.5
   );
 
-  console.log("A. Vertices length:",vertices.length);
-  console.log("A. Normals length:",normals.length);
-  console.log(eyeLg);
   fillVertices(eyeLg);
   fillColor(vec4(1, 1, 1, 1.0), eyeLg);
   fillVertices(eyeSm);
   fillColor(vec4(0.1, 0.1, 0.1, 1.0), eyeSm);
-  console.log("B. Vertices length:",vertices.length);
-  console.log("B. Normals length:",normals.length);
   // Parallel Circles
   fillIndices(range(currOffset, currOffset + eyeLg.length / 2 - 1));
   fillIndices(
@@ -671,10 +624,6 @@ const buildInstances = () => {
     connectParallelCylinders(eyeOffset + eyeSm.length + 1, numCirclePoints)
   );
 
-  console.log("Built eyes");
-  console.log("Vertices length:",vertices.length);
-  console.log("Normals length:",normals.length);
-
   // ***** Building the mesh *****
   let mesh = getRandomMesh(NUM_MESH_POINTS, NUM_MESH_POINTS);
   currOffset = vertices.length;
@@ -683,10 +632,6 @@ const buildInstances = () => {
   const meshIndices = connectMesh(currOffset, NUM_MESH_POINTS);
   fillIndices(meshIndices);
   fillNormals(getMeshVertexNormals(currOffset, NUM_MESH_POINTS));
-
-  console.log("Built mesh");
-  console.log("Vertices length:",vertices.length);
-  console.log("Normals length:",normals.length);
 
   // Prepare colors, vertices, and indices to be fed into the graphics pipeline.
   colors = flatten(colors);
