@@ -3,6 +3,8 @@
   <script id="vertex-shader" type="x-shader/x-vertex">
     #version 300 es
 
+    precision mediump float;
+
     in  vec4 aPosition;
     in  vec4 aColor;
     out vec4 vColor;
@@ -12,8 +14,15 @@
     uniform mat4 modelViewMatrix;
     uniform mat4 projectionMatrix;
 
+    uniform vec4 uLightAmbient;
+    uniform vec4 uDiffuseProduct;
+    uniform vec4 uSpecularProduct;
+    uniform float uShininess;
+
     void main()
     {
+        // Determine Vertex Position.
+
         // Compute the sines and cosines of theta for each of
         //   the three axes in one computation.
         vec3 angles =  uThetaView ; // convert degrees to radians
@@ -42,8 +51,32 @@
 
         vColor = aColor;
         gl_Position = projectionMatrix * rotationViewMatrix * modelViewMatrix * aPosition;
-        //gl_Position.z = -gl_Position.z;
         gl_PointSize = 30.0;
+
+        // Determine Vertex Color based on lighting.
+
+        vec3 pos = (uModelViewMatrix * aPosition).xyz;
+        if(uLightPosition.z == 0.0)  
+              L = normalize(uLightPosition.xyz);
+        else  
+              L = normalize(uLightPosition).xyz - pos;
+
+        E =  -normalize(pos);
+        N = normalize(uNormalMatrix*aNormal.xyz);
+
+        vec3 H = normalize( L + E );
+        vec4 ambient = uLightAmbient * aColor; // TODO: I use the color attribute here. Make sure this is correct.
+    
+        float Kd = max( dot(L, N), 0.0 );
+        vec4  diffuse = Kd*uDiffuseProduct;
+    
+        float Ks = pow( max(dot(N, H), 0.0), uShininess );
+        vec4  specular = Ks * uSpecularProduct;
+    
+        if( dot(L, N) < 0.0 ) specular = vec4(0.0, 0.0, 0.0, 1.0);
+    
+        vColor = ambient + diffuse +specular;
+        vColor.a = 1.0;
     }
   </script>
 

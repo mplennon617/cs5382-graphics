@@ -18,6 +18,7 @@ let zAxis = 2;
 // Global variables representing matrices for the Model view and projection pipelines.
 let modelViewMatrix;
 let projectionMatrix;
+let nMatrix;
 
 // Values set by sliders and render ticks.
 let thetaView = [0.0, 0.0, 0.0]; // Rotation angles for x, y and z axes
@@ -40,7 +41,9 @@ let deltaLoc; // Holds shader uniform variable location
 let uColorLoc; // Uniform for Color shading.
 let uOffsetLoc; // Uniform for point offsets.
 let uPointSizeLoc; // Uniform for point size.
+
 let modelViewMatrixLoc;
+let nMatrixLoc;
 
 // Arrays for keeping track of geometry.
 let colors = []; // List of all colors. An array of vec4s
@@ -48,7 +51,18 @@ let vertices = []; // List of all vertices. An array of vec3s
 let normals = []; // List of all vertex normals. An array of vec3s
 let indices = []; // List of all indices.
 
-// Constants.
+// Lighting constants.
+const lightPosition = vec4(1.0, 1.0, 1.0, 0.0);
+const lightAmbient = vec4(0.2, 0.2, 0.2, 1.0);
+const lightDiffuse = vec4(1.0, 1.0, 1.0, 1.0);
+const lightSpecular = vec4(1.0, 1.0, 1.0, 1.0);
+
+const materialAmbient = vec4(1.0, 0.0, 1.0, 1.0);
+const materialDiffuse = vec4(1.0, 0.8, 0.0, 1.0);
+const materialSpecular = vec4(1.0, 1.0, 1.0, 1.0);
+const materialShininess = 20.0;
+
+// Other Constants.
 const numCirclePoints = 30; // Number of points used to construct each circle FIXME: This cannot be changed, unfortunately, due to other hardcoded constraints
 const NUM_CHAINS = 10; // Number of chains 'binding' the chain chomp to the origin.
 const CHAIN_INDICES_LENGTH = 4641; // The number of elements in indices taken up by the chain sphere.
@@ -88,7 +102,7 @@ const fillVertices = (newVertices) => {
  * @param {Array} newNormals - The normals to add to the global array
  */
 const fillNormals = (newNormals) => {
-  vertices = vertices.concat(newNormals); // #NewNormal
+  normals = normals.concat(newNormals); // #NewNormal
 };
 
 /**
@@ -146,6 +160,7 @@ const getCircleVertices = (
   // Adapted and modified from James' example in the class Slack.
   let points = [];
   points.push(vec3(x, y, z));
+  fillNormals([0, 0, 1, 1]); // FIXME: REMOVE
   for (let i = 0; i <= numPoints; i++) {
     points.push(
       vec3(
@@ -154,6 +169,7 @@ const getCircleVertices = (
         z
       )
     );
+    fillNormals([0, 0, 1, 1]); // FIXME: REMOVE
   }
   return points;
 };
@@ -233,11 +249,6 @@ const getRandomMesh = (sideLength = 1.0, numMeshLinePoints = 20) => {
 
   for (let i = 0; i < numMeshLinePoints; i++) {
     for (let j = 0; j < numMeshLinePoints; j++) {
-      console.log([
-        i * (sideLength / numMeshLinePoints) - sideLength / 2,
-        MESH_SCALE * (2 * Math.random() - 1),
-        j * (sideLength / numMeshLinePoints) - sideLength / 2,
-      ]);
       points.push(
         vec3(
           i * (sideLength / numMeshLinePoints) - sideLength / 2,
@@ -248,6 +259,116 @@ const getRandomMesh = (sideLength = 1.0, numMeshLinePoints = 20) => {
     }
   }
   return points;
+};
+
+/**
+ * Utility function for returning the indices used to connect all the points in a sphere.
+ * Pre: Vertices were created using getRandomMesh.
+ *
+ * @param {int} verticesOffset - Wherre to begin connecting circles from the global vertices array.
+ * @param {int} numPoints - number of points for each circle (2D cross section).
+ * @returns the modified indices array.
+ */
+const getMeshVertexNormals = (verticesOffset, numMeshLinePoints) => {
+  let meshVertexNormals = [];
+
+  for (let i = 0; i < numMeshLinePoints; i++) {
+    const currVerticesOffset = verticesOffset + i * numMeshLinePoints;
+    for (let j = 0; j < numMeshLinePoints; j++) {
+      let pC, pN, pE, pS, pW;
+      let hasN = (hasE = hasS = hasW = false);
+
+      pC = vertices[currVerticesOffset + j];
+      if (i !== numMeshLinePoints - 1) {
+        pN = vertices[currVerticesOffset + j + numMeshLinePoints];
+        hasN = true;
+      }
+      if (i !== 0) {
+        pS = vertices[currVerticesOffset + j - numMeshLinePoints];
+        hasS = true;
+      }
+      if (j !== numMeshLinePoints - 1) {
+        pE = vertices[currVerticesOffset + j + 1];
+        hasE = true;
+      }
+      if (j !== 0) {
+        pW = vertices[currVerticesOffset + j - 1];
+        hasW = true;
+      }
+
+      let normal = vec3(0, 0, 0);
+
+      if (hasN) {
+        const tN = subtract(pN, pC);
+
+        // Northeast Normal
+        if (hasE) {
+          const tE = subtract(pE, pC);
+          const n1 = cross(tN, tE);
+          normal = add(normal, n1);
+        }
+        // Northwest Normal
+        if (hasW) {
+          const tW = subtract(Pw, pC);
+          const n4 = cross(tN, tW);
+          normal = add(normal, n4);
+        }
+      }
+      if (hasS) {
+        const tS = subtract(pS, pC);
+
+        if (hasE) {
+          const tE = subtract(pE, pC);
+          const n2 = cross(tS, tE);
+          normal = add(normal, n2);
+        }
+        if (hasW) {
+          const tW = subtract(Pw, pC);
+          const n3 = cross(tS, tW);
+          normal = add(normal, n4);
+        }
+      }
+
+      normal = normalize(normal);
+
+      meshVertexNormals.push(vec4(normal[0], normal[1], normal[2], 0.0));
+    }
+  }
+
+  return meshVertexNormals;
+};
+
+/**
+ * Utility function for returning the indices used to connect all the points in a sphere.
+ *
+ * @param {int} verticesOffset - Where to begin connecting circles from the global vertices array.
+ * @param {int} numPoints - number of points for each circle (2D cross section).
+ * @returns the modified indices array.
+ */
+const connectSphere = (verticesOffset, numCirclePoints) => {
+  let indices = [];
+
+  for (let i = 0; i < numCirclePoints; i++) {
+    const currVerticesOffset = verticesOffset + i * numCirclePoints;
+    for (let j = 0; j < numCirclePoints; j++) {
+      indices = indices.concat([
+        currVerticesOffset + j,
+        currVerticesOffset + j + 1,
+        currVerticesOffset + j + numCirclePoints + 1,
+        currVerticesOffset + j + numCirclePoints,
+        65535,
+      ]);
+    }
+    indices = indices.concat([
+      currVerticesOffset,
+      currVerticesOffset + (numCirclePoints - 1),
+      currVerticesOffset - 1,
+      Math.max(0, currVerticesOffset - (numCirclePoints - 1)),
+      65535,
+    ]);
+  }
+
+  return indices;
 };
 
 /**
@@ -291,12 +412,12 @@ const getSphereVertexNormals = (verticesOffset, numCirclePoints) => {
         const t3 = subtract(pS, pC);
         const t4 = subtract(Pw, pC);
 
-        const n1 = normalize(cross(t1, t2));
-        const n2 = normalize(cross(t2, t3));
-        const n3 = normalize(cross(t3, t4));
-        const n4 = normalize(cross(t4, t1));
+        const n1 = cross(t1, t2);
+        const n2 = cross(t2, t3);
+        const n3 = cross(t3, t4);
+        const n4 = cross(t4, t1);
 
-        const normal = add(add(add(n1, n2), n3), n4);
+        const normal = normalize(add(add(add(n1, n2), n3), n4));
 
         sphereVertexNormals.push(vec4(normal[0], normal[1], normal[2], 0.0));
       }
@@ -304,39 +425,6 @@ const getSphereVertexNormals = (verticesOffset, numCirclePoints) => {
   }
 
   return sphereVertexNormals;
-};
-
-/**
- * Utility function for returning the indices used to connect all the points in a sphere.
- *
- * @param {int} verticesOffset - Where to begin connecting circles from the global vertices array.
- * @param {int} numPoints - number of points for each circle (2D cross section).
- * @returns the modified indices array.
- */
-const connectSphere = (verticesOffset, numCirclePoints) => {
-  let indices = [];
-
-  for (let i = 0; i < numCirclePoints; i++) {
-    const currVerticesOffset = verticesOffset + i * numCirclePoints;
-    for (let j = 0; j < numCirclePoints; j++) {
-      indices = indices.concat([
-        currVerticesOffset + j,
-        currVerticesOffset + j + 1,
-        currVerticesOffset + j + numCirclePoints + 1,
-        currVerticesOffset + j + numCirclePoints,
-        65535,
-      ]);
-    }
-    indices = indices.concat([
-      currVerticesOffset,
-      currVerticesOffset + (numCirclePoints - 1),
-      currVerticesOffset - 1,
-      Math.max(0, currVerticesOffset - (numCirclePoints - 1)),
-      65535,
-    ]);
-  }
-
-  return indices;
 };
 
 /**
@@ -365,49 +453,63 @@ const connectParallelCylinders = (verticesOffset, numPoints) => {
   return indices;
 };
 
+// FIXME: Implement lighting for spheres
 /**
- * Utility function for returning the indices used to connect all the points in a sphere.
- * Pre: Vertices were created using getSphereVertices.
+ * Utility function for returning the indices used to connect all the points in a Cyl.
+ * Pre: Vertices were created using getParallelVertices on a circle.
  *
  * @param {int} verticesOffset - Wherre to begin connecting circles from the global vertices array.
  * @param {int} numPoints - number of points for each circle (2D cross section).
  * @returns the modified indices array.
  */
 const getCylinderVertexNormals = (verticesOffset, numCirclePoints) => {
-  let cylVertexNormals = [];
-
-  let circle2Idx = numPoints + 1;
-
-  for (let i = verticesOffset; i <= verticesOffset + numPoints; i++) {
-
-    let pC = vertices[currVerticesOffset + j];
-    let pN = vertices[currVerticesOffset + j + numCirclePoints];
-    let pE = vertices[currVerticesOffset + j + 1];
-    let pS = vertices[currVerticesOffset + j - numCirclePoints];
-    let pW; // TODO: Check if this calculation is correct
-    if (j === 0) {
-      pW = vertices[currVerticesOffset + j + numCirclePoints - 1];
-    } else {
-      pW = vertices[currVerticesOffset + j - 1];
-    }
-
-    const t1 = subtract(pN, pC);
-    const t2 = subtract(pE, pC);
-    const t3 = subtract(pS, pC);
-    const t4 = subtract(Pw, pC);
-
-    const n1 = normalize(cross(t1, t2));
-    const n2 = normalize(cross(t2, t3));
-    const n3 = normalize(cross(t3, t4));
-    const n4 = normalize(cross(t4, t1));
-
-    const normal = add(add(add(n1, n2), n3), n4);
-
-    sphereVertexNormals.push(vec4(normal[0], normal[1], normal[2], 0.0));
-    
-  }
-
-  return cylVertexNormals;
+  // let cylVertexNormals = [];
+  // let circle2Idx = numPoints + 1;
+  // // Bottom of the circle
+  // points.push(vec3(x, y, z));
+  // for (let i = 0; i <= numPoints; i++) {
+  //   points.push(
+  //     vec3(
+  //       radius * Math.cos((i * 2 * Math.PI) / numPoints) + x,
+  //       radius * Math.sin((i * 2 * Math.PI) / numPoints) + y,
+  //       z
+  //     )
+  //   );
+  // }
+  // // Top of the circle
+  // points.push(vec3(x, y, z));
+  // for (let i = 0; i <= numPoints; i++) {
+  //   points.push(
+  //     vec3(
+  //       radius * Math.cos((i * 2 * Math.PI) / numPoints) + x,
+  //       radius * Math.sin((i * 2 * Math.PI) / numPoints) + y,
+  //       z
+  //     )
+  //   );
+  // }
+  // for (let i = verticesOffset; i <= verticesOffset + numPoints; i++) {
+  //   let pC = vertices[currVerticesOffset + j];
+  //   let pN = vertices[currVerticesOffset + j + numCirclePoints];
+  //   let pE = vertices[currVerticesOffset + j + 1];
+  //   let pS = vertices[currVerticesOffset + j - numCirclePoints];
+  //   let pW; // TODO: Check if this calculation is correct
+  //   if (j === 0) {
+  //     pW = vertices[currVerticesOffset + j + numCirclePoints - 1];
+  //   } else {
+  //     pW = vertices[currVerticesOffset + j - 1];
+  //   }
+  //   const t1 = subtract(pN, pC);
+  //   const t2 = subtract(pE, pC);
+  //   const t3 = subtract(pS, pC);
+  //   const t4 = subtract(Pw, pC);
+  //   const n1 = normalize(cross(t1, t2));
+  //   const n2 = normalize(cross(t2, t3));
+  //   const n3 = normalize(cross(t3, t4));
+  //   const n4 = normalize(cross(t4, t1));
+  //   const normal = add(add(add(n1, n2), n3), n4);
+  //   sphereVertexNormals.push(vec4(normal[0], normal[1], normal[2], 0.0));
+  // }
+  // return cylVertexNormals;
 };
 
 /**
@@ -605,15 +707,38 @@ window.onload = () => {
   thetaViewLoc = gl.getUniformLocation(program, "uThetaView");
   deltaLoc = gl.getUniformLocation(program, "uDelta");
 
-  // Define transformation matrices for modelView and Projections.
+  // Define transformation matrices for modelView, projections, and normals.
   modelViewMatrixLoc = gl.getUniformLocation(program, "modelViewMatrix");
-
-  const projectionMatrix = ortho(-15, 15, -15, 15, -15, 15);
+  projectionMatrix = ortho(-15, 15, -15, 15, -15, 15);
   gl.uniformMatrix4fv(
     gl.getUniformLocation(program, "projectionMatrix"),
     false,
     flatten(projectionMatrix)
   );
+  nMatrixLoc = gl.getUniformLocation(program, "uNormalMatrix");
+
+  // Define Lighting constant uniforms.
+  const lightAmbient = mult(lightAmbient, materialAmbient);
+  const diffuseProduct = mult(lightDiffuse, materialDiffuse);
+  const specularProduct = mult(lightSpecular, materialSpecular);
+
+  gl.uniform4fv(
+    gl.getUniformLocation(program, "uLightAmbient"),
+    flatten(lightAmbient)
+  );
+  gl.uniform4fv(
+    gl.getUniformLocation(program, "uDiffuseProduct"),
+    flatten(diffuseProduct)
+  );
+  gl.uniform4fv(
+    gl.getUniformLocation(program, "uSpecularProduct"),
+    flatten(specularProduct)
+  );
+  gl.uniform4fv(
+    gl.getUniformLocation(program, "uLightPosition"),
+    flatten(lightPosition)
+  );
+  gl.uniform1f(gl.getUniformLocation(program, "uShininess"), materialShininess);
 
   // Define javascript events for the HTML elements used to manipulate the scene.
   document.getElementById("ButtonC").onclick = () => {
@@ -662,8 +787,10 @@ window.onload = () => {
  */
 const mesh = () => {
   const t = mult(rotateZ(-8), mult(scale(15, 1, 1), translate(10, -1.6, 0)));
+  nMatrix = normalMatrix(t, true);
 
   gl.uniformMatrix4fv(modelViewMatrixLoc, false, flatten(t));
+  gl.uniformMatrix3fv(nMatrixLoc, false, flatten(nMatrix));
   gl.drawElements(
     gl.TRIANGLE_FAN,
     MESH_INDICES_LENGTH,
@@ -745,7 +872,10 @@ const base = (time) => {
     }
 
     const t = mult(modelViewMatrix, instanceMatrix);
+    nMatrix = normalMatrix(t, true);
+
     gl.uniformMatrix4fv(modelViewMatrixLoc, false, flatten(t));
+    gl.uniformMatrix3fv(nMatrixLoc, false, flatten(nMatrix));
     gl.drawElements(
       gl.TRIANGLE_FAN,
       CHAIN_INDICES_LENGTH,
@@ -810,7 +940,10 @@ const head = (time) => {
 
   t = mult(modelViewMatrix, instanceMatrix);
 
+  nMatrix = normalMatrix(t, true);
+
   gl.uniformMatrix4fv(modelViewMatrixLoc, false, flatten(t));
+  gl.uniformMatrix3fv(nMatrixLoc, false, flatten(nMatrix));
 
   gl.drawElements(
     gl.TRIANGLE_FAN,
@@ -848,7 +981,10 @@ const eyes = (time) => {
 
   let t = mult(modelViewMatrix, instanceMatrix);
 
+  nMatrix = normalMatrix(t, true); // TODO: Is t correct here?
+
   gl.uniformMatrix4fv(modelViewMatrixLoc, false, flatten(t));
+  gl.uniformMatrix3fv(nMatrixLoc, false, flatten(nMatrix));
 
   gl.drawElements(
     gl.TRIANGLE_FAN,
@@ -867,7 +1003,10 @@ const eyes = (time) => {
 
   t = mult(modelViewMatrix, instanceMatrix);
 
+  nMatrix = normalMatrix(t, true);
+
   gl.uniformMatrix4fv(modelViewMatrixLoc, false, flatten(t));
+  gl.uniformMatrix3fv(nMatrixLoc, false, flatten(nMatrix));
 
   gl.drawElements(
     gl.TRIANGLE_FAN,
