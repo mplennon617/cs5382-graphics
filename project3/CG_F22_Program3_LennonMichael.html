@@ -11,6 +11,9 @@
     in  vec4 aColor;
     out vec4 vColor;
 
+    in  vec2 aTexCoord;
+    out vec2 vTexCoord;
+
     out vec3 L;
 
     // Model and View Uniforms
@@ -88,6 +91,10 @@
 
         vColor = ambient + diffuse +specular;
         vColor.a = 1.0;
+
+        // Define Texture Coordinate.
+        
+        vTexCoord = aTexCoord;
     }
   </script>
 
@@ -100,6 +107,9 @@
     out vec4 fColor;
 
     in vec3 L;
+    in vec2 vTexCoord;
+
+    uniform sampler2D uTexMap;
     uniform vec4 uDiffuseProduct;
 
     void main() 
@@ -120,6 +130,9 @@
     in  vec4 aColor;
     out vec4 vColor;
 
+    in  vec2 aTexCoord;
+    out vec2 vTexCoord;
+
     out vec3 L;
 
     // Model and View Uniforms
@@ -197,6 +210,10 @@
 
         vColor = ambient + diffuse +specular;
         vColor.a = 1.0;
+
+        // Define Texture Coordinate.
+        
+        vTexCoord = aTexCoord;
     }
   </script>
 
