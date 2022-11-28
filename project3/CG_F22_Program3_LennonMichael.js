@@ -216,7 +216,7 @@ const getSphereVertices = (
 ) => {
   // Adapted and modified from demo at end of class on 10.19.22.
   let points = [];
-
+  let count = 0;
   for (let i = 0; i <= numCirclePoints; i++) {
     for (let j = 0; j < numCirclePoints; j++) {
       const theta = (i / 2 / numCirclePoints) * 2 * Math.PI;
@@ -243,15 +243,10 @@ const getSphereVertices = (
  * @param {int} numPoints - Number of points used to draw the sphere.
  * @returns A Float32Array containing all the points of the sphere.
  */
- const getSphereTexCoords = (
-  x = 0.0,
-  y = 0.0,
-  z = 0.0,
-  radius = 1.0,
-  numCirclePoints = 50
-) => {
+ const getSphereTexCoords = (numCirclePoints = 50) => {
   // Adapted and modified from demo at end of class on 10.19.22.
   let points = [];
+  let count = 0;
 
   for (let i = 0; i <= numCirclePoints; i++) {
     for (let j = 0; j < numCirclePoints; j++) {
@@ -608,7 +603,7 @@ const buildInstances = () => {
   );
   fillIndices(connectSphere(0, NUM_CHAIN_POINTS));
   fillNormals(getSphereVertexNormals(0, NUM_CHAIN_POINTS));
-
+  fillTexCoords(getSphereTexCoords(NUM_CHAIN_POINTS));
   // ***** Building the head *****
   let sphere1 = getSphereVertices(0, 0, 0, 3, NUM_HEAD_POINTS);
   fillVertices(sphere1);
@@ -619,6 +614,7 @@ const buildInstances = () => {
   );
   fillIndices(connectSphere(930, NUM_HEAD_POINTS));
   fillNormals(getSphereVertexNormals(930, NUM_HEAD_POINTS));
+  fillTexCoords(getSphereTexCoords(NUM_HEAD_POINTS));
 
   // ***** Building the eyes *****
   let eyeOffset = vertices.length;
@@ -675,12 +671,17 @@ const buildInstances = () => {
  * Function for configuring the 1024x1024 bump map texture.
  * @param {*} image - the image to configure.
  */
-function configureTexture( image ) {
-  var texture = gl.createTexture();
+const configureTexture = image => {
+  let texture = gl.createTexture();
   gl.activeTexture(gl.TEXTURE0);
   gl.bindTexture(gl.TEXTURE_2D, texture);
   gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, texSize, texSize, 0, gl.RGB, gl.UNSIGNED_BYTE, image);
   gl.generateMipmap(gl.TEXTURE_2D);
+}
+
+const configureImage = () => {
+  let image = new Image();
+  image.src = "MetalBumpMap.jpg";  // MUST BE SAME DOMAIN!!!
 }
 
 const setupSliders = () => {
@@ -815,7 +816,7 @@ window.onload = () => {
   gl.enableVertexAttribArray(positionLoc);
 
   // Bind vertex normals (NORMALS) to the gl array buffer.
-  var nBuffer = gl.createBuffer();
+  let nBuffer = gl.createBuffer();
   gl.bindBuffer(gl.ARRAY_BUFFER, nBuffer);
   gl.bufferData(gl.ARRAY_BUFFER, normals, gl.STATIC_DRAW);
 
@@ -823,12 +824,12 @@ window.onload = () => {
   gl.vertexAttribPointer(normalLoc, 4, gl.FLOAT, false, 0, 0);
   gl.enableVertexAttribArray(normalLoc);
 
-  // Bind Texture (TEXCOORDS) to the gl array buffer. TODO: Readd
-  // var tBuffer = gl.createBuffer();
-  // gl.bindBuffer( gl.ARRAY_BUFFER, tBuffer);
-  // gl.bufferData( gl.ARRAY_BUFFER, flatten(texCoords), gl.STATIC_DRAW);
+  // Bind Texture (TEXCOORDS) to the gl array buffer.
+  let tBuffer = gl.createBuffer();
+  gl.bindBuffer( gl.ARRAY_BUFFER, tBuffer);
+  gl.bufferData( gl.ARRAY_BUFFER, flatten(texCoords), gl.STATIC_DRAW);
 
-  var texCoordLoc = gl.getAttribLocation( program, "aTexCoord");
+  let texCoordLoc = gl.getAttribLocation( program, "aTexCoord");
   gl.vertexAttribPointer( texCoordLoc, 2, gl.FLOAT, false, 0, 0);
   gl.enableVertexAttribArray(texCoordLoc);
 
