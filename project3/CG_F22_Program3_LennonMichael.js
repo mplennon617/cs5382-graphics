@@ -23,7 +23,7 @@ let nMatrix;
 // Values set by sliders and render ticks.
 let thetaView = [0.0, 4, 0.0]; // Rotation angles for x, y and z axes
 let figureSliderVals = [0, 0, 0, 0, 0]; // Values for all user-controlled sliders
-let lightSliderVals = [1,1,1];
+let lightSliderVals = [1, 1, 1];
 let scaleSliderVal = 1;
 let toggleRot = true; // Toggle Rotation Control
 let dir = false; // Toggle Rotation Direction
@@ -58,14 +58,14 @@ let texCoords = []; // List of all texture coordinates. An array of vec2s
 // Lighting and Texture constants.
 let lightPosition = vec4(1.0, 1.0, 1.0, 0.0);
 let lightAmbient = vec4(0.8, 0.8, 0.8, 1.0);
-let lightDiffuse = vec4(0.2, 0.3, 0.2, 1.0);  // NOTE: Green diffuse component is a little higher
+let lightDiffuse = vec4(0.2, 0.3, 0.2, 1.0); // NOTE: Green diffuse component is a little higher
 let lightSpecular = vec4(1.0, 1.0, 1.0, 1.0);
 
 const materialDiffuse = vec4(0.15, 0.15, 0.15, 1.0);
 const materialSpecular = vec4(0.8, 0.8, 0.8, 1.0);
 const materialShininess = 20.0;
 
-const texSize = 1024; // Size of the bump map image.
+let texSize = 1024; // Size of the bump map image.
 
 // Other Constants.
 const numCirclePoints = 30; // Number of points used to construct each circle FIXME: This cannot be changed, unfortunately, due to other hardcoded constraints
@@ -83,9 +83,9 @@ const HEAD_SQUISH = 0.8; // The amount that the head "squishes" after performing
 const MESH_SCALE = 0.3; // The amount of random variation in the Y direction for the 2D mesh.
 
 let test = 0;
-// ----------------------------------------------------------------------
-//                           Fill Functions
-// ----------------------------------------------------------------------
+// -----------------------------------------------------------------------------------------------
+//                                        Fill Functions
+// -----------------------------------------------------------------------------------------------
 
 /**
  * Fills the global color array with the given vector.
@@ -110,7 +110,7 @@ const fillVertices = (newVertices) => {
  * Fills the global vertices array with the given vertices.
  * @param {Array} newNormals - The normals to add to the global array
  */
- const fillTexCoords = (newTexCoords) => {
+const fillTexCoords = (newTexCoords) => {
   texCoords = texCoords.concat(newTexCoords); // #NewNormal
 };
 
@@ -153,9 +153,9 @@ const fillSphereColorGradient = (colorVec1, colorVec2, vertices) => {
   colors = colors.concat(colorArr);
 };
 
-// ----------------------------------------------------------------------
-//         Utility functions for calculating vertices and indices
-// ----------------------------------------------------------------------
+// -----------------------------------------------------------------------------------------------
+//                      Utility functions for calculating vertices and indices
+// -----------------------------------------------------------------------------------------------
 
 /**
  * Returns a list of points representing a circle.
@@ -243,19 +243,14 @@ const getSphereVertices = (
  * @param {int} numPoints - Number of points used to draw the sphere.
  * @returns A Float32Array containing all the points of the sphere.
  */
- const getSphereTexCoords = (numCirclePoints = 50) => {
+const getSphereTexCoords = (numCirclePoints = 50) => {
   // Adapted and modified from demo at end of class on 10.19.22.
   let points = [];
   let count = 0;
 
   for (let i = 0; i <= numCirclePoints; i++) {
     for (let j = 0; j < numCirclePoints; j++) {
-      points.push(
-        vec2(
-          j / numCirclePoints,
-          i / numCirclePoints
-        )
-      );
+      points.push(vec2(j / numCirclePoints, i / numCirclePoints));
     }
   }
   return points;
@@ -510,17 +505,6 @@ const connectParallelCylinders = (verticesOffset, numPoints) => {
   return indices;
 };
 
-// FIXME: Implement lighting for cylinders
-/**
- * Utility function for returning the indices used to connect all the points in a Cyl.
- * Pre: Vertices were created using getParallelVertices on a circle.
- *
- * @param {int} verticesOffset - Wherre to begin connecting circles from the global vertices array.
- * @param {int} numPoints - number of points for each circle (2D cross section).
- * @returns the modified indices array.
- */
-const getCylinderVertexNormals = (verticesOffset, numCirclePoints) => {};
-
 /**
  * Utility function for returing the indices used to connect a 2D square mesh.
  *
@@ -541,7 +525,6 @@ const connectMesh = (verticesOffset, numMeshLinePoints) => {
       1;
     i += numMeshLinePoints
   ) {
-
     for (let j = i; j < i + numMeshLinePoints - 1; j++) {
       {
         indices = indices.concat([
@@ -558,9 +541,9 @@ const connectMesh = (verticesOffset, numMeshLinePoints) => {
   return indices;
 };
 
-// ----------------------------------------------------------------------
-//                       Other Utility Functions
-// ----------------------------------------------------------------------
+// -----------------------------------------------------------------------------------------------
+//                                       Other Utility Functions
+// -----------------------------------------------------------------------------------------------
 
 /**
  * Utility function to return an array from [start, end].
@@ -580,13 +563,13 @@ const range = (start, end) => {
   return arr;
 };
 
-// ----------------------------------------------------------------------
-//                         Drawing Everything
-// ----------------------------------------------------------------------
+// -----------------------------------------------------------------------------------------------
+//                                        Drawing Everything
+// -----------------------------------------------------------------------------------------------
 
-// ----------------------------------------------------------------------
-//                         Instance Building
-// ----------------------------------------------------------------------
+// -----------------------------------------------------------------------------------------------
+//                                        Instance Building
+// -----------------------------------------------------------------------------------------------
 
 /**
  * Function used to build up the colors, vertices, and indices arrays with
@@ -663,141 +646,112 @@ const buildInstances = () => {
   indices = new Uint16Array(indices);
 };
 
-// ----------------------------------------------------------------------
-//                     GL program and Shader Setup
-// ----------------------------------------------------------------------
+// -----------------------------------------------------------------------------------------------
+//                                 Image and Texture Configuration
+// -----------------------------------------------------------------------------------------------
 
 /**
  * Function for configuring the 1024x1024 bump map texture.
  * @param {*} image - the image to configure.
  */
-const configureTexture = image => {
+const configureTexture = (image) => {
+  console.log("configuring texture with image",image);
   let texture = gl.createTexture();
   gl.activeTexture(gl.TEXTURE0);
   gl.bindTexture(gl.TEXTURE_2D, texture);
-  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, texSize, texSize, 0, gl.RGB, gl.UNSIGNED_BYTE, image);
+  gl.texImage2D(
+    gl.TEXTURE_2D,
+    0,
+    gl.RGB,
+    texSize,
+    texSize,
+    0,
+    gl.RGB,
+    gl.UNSIGNED_BYTE,
+    image
+  );
   gl.generateMipmap(gl.TEXTURE_2D);
-}
+};
 
 // TODO: Use https://webgl2fundamentals.org/webgl/lessons/webgl-image-processing.html
-const configureImage = () => {
-  let image = new Image();
-  image.src = "MetalBumpMap.jpg";  // MUST BE SAME DOMAIN!!!
-}
+const textureMapping = () => {
+  let resultImage = new Image();
+  resultImage.src = "MetalBumpMap.jpg"; // MUST BE SAME DOMAIN!!!
+  resultImage.onload = () => {
+    // *****onLoad code adopted from Hello2DTexture_ImageFileReader.js
+    let canvas = document.createElement("canvas");
+    let ctx = canvas.getContext("2d");
 
-const setupSliders = () => {
-    // Define javascript events for the HTML elements used to manipulate the scene.
+    texSize = resultImage.width; // Rendundant, but forces texSize variable to adjust if a different image is used
+    // Render the loaded image to the canvas
+    ctx.drawImage(resultImage, 0, 0, resultImage.width, resultImage.height);
+    // Get the image rendered to the canvas, returns a Uint8ClampedArray
+    let imageData = ctx.getImageData(
+      0,
+      0,
+      resultImage.width,
+      resultImage.height
+    ); // FIXME: Why is most of the data 0?
+    console.log(imageData.width, imageData.height);
+    console.log(imageData);
 
-    // *****  Reset, Freeze, and Big Jump (From Program 2) *****
-    document.getElementById("ButtonR").onclick = () => {
-      figureSliderVals = [0, 0, 0, 0, 0];
-    };
-    document.getElementById("ButtonF").onclick = () => {
-      freeze = !freeze;
-    };
-    document.getElementById("ButtonJ").onclick = () => {
-      freeze = false;
-      bigJumpState = 3;
-    };
+    // Convert to Array for modification
+    let image = new Array(resultImage.width * resultImage.height * 4);
+    for (let i = 0; i < resultImage.width * resultImage.height * 4; i++)
+      image[i] = imageData.data[i];
 
-    // ***** Lighting manipulation ***** 
-    document.getElementById("ButtonB").onclick = () => {
-      brightness += 0.1;
-      lightAmbient = vec4(brightness, brightness, brightness, 1.0);
-      gl.uniform4fv(
-        gl.getUniformLocation(program, "uLightAmbient"),
-        flatten(lightAmbient)
-      );
-    };
-    document.getElementById("ButtonD").onclick = () => {
-      brightness -= 0.1;
-      lightAmbient = vec4(brightness, brightness, brightness, 1.0);
-      gl.uniform4fv(
-        gl.getUniformLocation(program, "uLightAmbient"),
-        flatten(lightAmbient)
-      );
-    };
-    document.getElementById("lightXSlider").onchange = () => {
-      lightSliderVals[0] = event.srcElement.value;
-      lightPosition = [...lightSliderVals, 0.0];
-      gl.uniform4fv(
-        gl.getUniformLocation(program, "uLightPosition"),
-        lightPosition
-      );
-    };
-    document.getElementById("lightYSlider").onchange = () => {
-      lightSliderVals[1] = event.srcElement.value;
-      lightPosition = [...lightSliderVals, 0.0];
-      gl.uniform4fv(
-        gl.getUniformLocation(program, "uLightPosition"),
-        lightPosition
-      );
-    };
-    document.getElementById("lightZSlider").onchange = () => {
-      lightSliderVals[2] = event.srcElement.value;
-      lightPosition = [...lightSliderVals, 0.0];
-      gl.uniform4fv(
-        gl.getUniformLocation(program, "uLightPosition"),
-        lightPosition
-      );
-    };
-  
-    // ***** Scene Rotation ***** 
-    document.getElementById("cSlide").onchange = () => {
-      figureSliderVals[Base] = event.srcElement.value;
-    };
-    document.getElementById("hxSlide").onchange = () => {
-      figureSliderVals[HeadZ] = event.srcElement.value;
-    };
-    document.getElementById("hySlide").onchange = () => {
-      figureSliderVals[HeadY] = event.srcElement.value;
-    };
-    document.getElementById("exSlide").onchange = () => {
-      figureSliderVals[EyesX] = event.srcElement.value;
-    };
-    document.getElementById("eySlide").onchange = () => {
-      figureSliderVals[EyesY] = event.srcElement.value;
-    };
-  
-    // ***** Articulated figure manipulation *****
-    document.getElementById("rotXSlider").onchange = () => {
-      thetaView[0] = event.srcElement.value;
-    };
-    document.getElementById("rotYSlider").onchange = () => {
-      thetaView[1] = event.srcElement.value;
-    };
-    document.getElementById("rotZSlider").onchange = () => {
-      thetaView[2] = event.srcElement.value;
-    };
-    document.getElementById("scaleSlider").onchange = () => {
-      scaleSliderVal = event.srcElement.value;
-    };
-}
+    // Normalize Data to [0,1]
+    let normalizedData = image.map((x) => x / 255.0);
+    console.log("normalizedData", normalizedData);
+
+    // Bump Map Normals (Adopted from bumpMap.js)
+    // Note conversion from 1D Array to 2D Array
+    let normalst = new Array();
+    for (let i = 0; i < texSize; i++) normalst[i] = new Array();
+    for (let i = 0; i < texSize; i++)
+      for (let j = 0; j < texSize; j++) normalst[i][j] = new Array();
+    for (let i = 0; i < texSize; i++)
+      for (let j = 0; j < texSize; j++) {
+        normalst[i][j][0] = normalizedData[i*texSize+j] - normalizedData[(i+1)*texSize+j];
+        normalst[i][j][1] = normalizedData[i*texSize+j] - normalizedData[i*texSize+j+1];
+        normalst[i][j][2] = 1;
+      }
+      console.log("normalst:",normalst);
+
+    // Scale to Texture Coordinates (Adopted from bumpMap.js)
+
+    for (let i = 0; i < texSize; i++)
+      for (let j = 0; j < texSize; j++) {
+        let d = 0;
+        for (let k = 0; k < 3; k++) d += normalst[i][j][k] * normalst[i][j][k];
+        d = Math.sqrt(d);
+        for (let k = 0; k < 3; k++)
+          normalst[i][j][k] = (0.5 * normalst[i][j][k]) / d + 0.5;
+      }
+      console.log("normalst scaled:",normalst);
+
+    // Normal Texture Array (Adopted from bumpMap.js)
+    let normals = new Uint8Array(3 * texSize * texSize);
+
+    for (let i = 0; i < texSize; i++)
+      for (let j = 0; j < texSize; j++)
+        for (let k = 0; k < 3; k++)
+          normals[3 * texSize * i + 3 * j + k] = 255 * normalst[i][j][k];
+    console.log("normals:",normals);
+
+    // Configure the bump map texture with the resulting normal texture array.
+    configureTexture(normals);
+  };
+};
+
+// -----------------------------------------------------------------------------------------------
+//                                  GL program and Shader Setup
+// -----------------------------------------------------------------------------------------------
 
 /**
- * Intializes shaders and bufferData.
+ *
  */
-window.onload = () => {
-  canvas = document.getElementById("gl-canvas");
-
-  gl = canvas.getContext("webgl2");
-  if (!gl) alert("WebGL 2.0 isn't available");
-
-  gl.viewport(0, 0, canvas.width, canvas.height);
-  gl.clearColor(0.52, 0.8, 0.92, 1.0);
-
-  gl.enable(gl.DEPTH_TEST);
-  gl.enable(gl.PRIMITIVE_RESTART_FIXED_INDEX);
-
-  //
-  //  Load shaders and initialize attribute buffers
-  //
-  program = initShaders(gl, "vertex-shader", "fragment-shader");
-  gl.useProgram(program);
-
-  // Fill colors and vertices arrays with all the shapes.
-  buildInstances();
-
+const bindBuffers = () => {
   // Bind vertex colors (COLORS) to the gl array buffer.
   const cBuffer = gl.createBuffer();
   gl.bindBuffer(gl.ARRAY_BUFFER, cBuffer);
@@ -827,18 +781,23 @@ window.onload = () => {
 
   // Bind Texture (TEXCOORDS) to the gl array buffer.
   let tBuffer = gl.createBuffer();
-  gl.bindBuffer( gl.ARRAY_BUFFER, tBuffer);
-  gl.bufferData( gl.ARRAY_BUFFER, flatten(texCoords), gl.STATIC_DRAW);
+  gl.bindBuffer(gl.ARRAY_BUFFER, tBuffer);
+  gl.bufferData(gl.ARRAY_BUFFER, flatten(texCoords), gl.STATIC_DRAW);
 
-  let texCoordLoc = gl.getAttribLocation( program, "aTexCoord");
-  gl.vertexAttribPointer( texCoordLoc, 2, gl.FLOAT, false, 0, 0);
+  let texCoordLoc = gl.getAttribLocation(program, "aTexCoord");
+  gl.vertexAttribPointer(texCoordLoc, 2, gl.FLOAT, false, 0, 0);
   gl.enableVertexAttribArray(texCoordLoc);
 
   // Bind topology (INDICES) to the gl element array buffer.
   let iBuffer = gl.createBuffer();
   gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, iBuffer);
   gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indices, gl.STATIC_DRAW);
+};
 
+/**
+ *
+ */
+const defineConstantUniforms = () => {
   // Define uniforms for pedestal translation and rotation.
   thetaViewLoc = gl.getUniformLocation(program, "uThetaView");
   deltaLoc = gl.getUniformLocation(program, "uDelta");
@@ -874,6 +833,132 @@ window.onload = () => {
     flatten(lightPosition)
   );
   gl.uniform1f(gl.getUniformLocation(program, "uShininess"), materialShininess);
+};
+
+/**
+ *
+ */
+const setupSliders = () => {
+  // Define javascript events for the HTML elements used to manipulate the scene.
+
+  // *****  Reset, Freeze, and Big Jump (From Program 2) *****
+  document.getElementById("ButtonR").onclick = () => {
+    figureSliderVals = [0, 0, 0, 0, 0];
+  };
+  document.getElementById("ButtonF").onclick = () => {
+    freeze = !freeze;
+  };
+  document.getElementById("ButtonJ").onclick = () => {
+    freeze = false;
+    bigJumpState = 3;
+  };
+
+  // ***** Lighting manipulation *****
+  document.getElementById("ButtonB").onclick = () => {
+    brightness += 0.1;
+    lightAmbient = vec4(brightness, brightness, brightness, 1.0);
+    gl.uniform4fv(
+      gl.getUniformLocation(program, "uLightAmbient"),
+      flatten(lightAmbient)
+    );
+  };
+  document.getElementById("ButtonD").onclick = () => {
+    brightness -= 0.1;
+    lightAmbient = vec4(brightness, brightness, brightness, 1.0);
+    gl.uniform4fv(
+      gl.getUniformLocation(program, "uLightAmbient"),
+      flatten(lightAmbient)
+    );
+  };
+  document.getElementById("lightXSlider").onchange = () => {
+    lightSliderVals[0] = event.srcElement.value;
+    lightPosition = [...lightSliderVals, 0.0];
+    gl.uniform4fv(
+      gl.getUniformLocation(program, "uLightPosition"),
+      lightPosition
+    );
+  };
+  document.getElementById("lightYSlider").onchange = () => {
+    lightSliderVals[1] = event.srcElement.value;
+    lightPosition = [...lightSliderVals, 0.0];
+    gl.uniform4fv(
+      gl.getUniformLocation(program, "uLightPosition"),
+      lightPosition
+    );
+  };
+  document.getElementById("lightZSlider").onchange = () => {
+    lightSliderVals[2] = event.srcElement.value;
+    lightPosition = [...lightSliderVals, 0.0];
+    gl.uniform4fv(
+      gl.getUniformLocation(program, "uLightPosition"),
+      lightPosition
+    );
+  };
+
+  // ***** Scene Rotation *****
+  document.getElementById("cSlide").onchange = () => {
+    figureSliderVals[Base] = event.srcElement.value;
+  };
+  document.getElementById("hxSlide").onchange = () => {
+    figureSliderVals[HeadZ] = event.srcElement.value;
+  };
+  document.getElementById("hySlide").onchange = () => {
+    figureSliderVals[HeadY] = event.srcElement.value;
+  };
+  document.getElementById("exSlide").onchange = () => {
+    figureSliderVals[EyesX] = event.srcElement.value;
+  };
+  document.getElementById("eySlide").onchange = () => {
+    figureSliderVals[EyesY] = event.srcElement.value;
+  };
+
+  // ***** Articulated figure manipulation *****
+  document.getElementById("rotXSlider").onchange = () => {
+    thetaView[0] = event.srcElement.value;
+  };
+  document.getElementById("rotYSlider").onchange = () => {
+    thetaView[1] = event.srcElement.value;
+  };
+  document.getElementById("rotZSlider").onchange = () => {
+    thetaView[2] = event.srcElement.value;
+  };
+  document.getElementById("scaleSlider").onchange = () => {
+    scaleSliderVal = event.srcElement.value;
+  };
+};
+
+/**
+ * Onload function.
+ */
+window.onload = () => {
+  canvas = document.getElementById("gl-canvas");
+
+  gl = canvas.getContext("webgl2");
+  if (!gl) alert("WebGL 2.0 isn't available");
+
+  gl.viewport(0, 0, canvas.width, canvas.height);
+  gl.clearColor(0.52, 0.8, 0.92, 1.0);
+
+  gl.enable(gl.DEPTH_TEST);
+  gl.enable(gl.PRIMITIVE_RESTART_FIXED_INDEX);
+
+  //
+  //  Load shaders and initialize attribute buffers
+  //
+  program = initShaders(gl, "vertex-shader", "fragment-shader");
+  gl.useProgram(program);
+
+  // Fill colors and vertices arrays with all the shapes.
+  buildInstances();
+
+  // Bind all array buffers used by gl.drawElements().
+  bindBuffers();
+
+  // Define uniforms for lighting and model transformation.
+  defineConstantUniforms();
+
+  // Setup the bumpmap texture.
+  textureMapping();
 
   // Setup slider behavior on the UI.
   setupSliders();
@@ -882,15 +967,18 @@ window.onload = () => {
   render();
 };
 
-// ----------------------------------------------------------------------
-//         Render Functions (Called continuously during runtime)
-// ----------------------------------------------------------------------
+// -----------------------------------------------------------------------------------------------
+//                      Render Functions (Called continuously during runtime)
+// -----------------------------------------------------------------------------------------------
 
 /**
  * Function to draw the 2D mesh.
  */
 const mesh = () => {
-  const instanceMatrix = mult(rotateZ(-8), mult(scale(15, 1, 1), translate(10, -1.6, 0)));
+  const instanceMatrix = mult(
+    rotateZ(-8),
+    mult(scale(15, 1, 1), translate(10, -1.6, 0))
+  );
   const t = mult(modelViewMatrix, instanceMatrix);
 
   nMatrix = normalMatrix(t, true);
@@ -1136,7 +1224,10 @@ const render = () => {
   // ***** Draw each part of the figure, manipulating the model View matrix as we go. *****
   mesh();
 
-  modelViewMatrix = mult(modelViewMatrix, rotate(figureSliderVals[Base], vec3(0, 1, 0)));
+  modelViewMatrix = mult(
+    modelViewMatrix,
+    rotate(figureSliderVals[Base], vec3(0, 1, 0))
+  );
   base(t);
 
   gl.uniform3fv(thetaViewLoc, thetaView); // Update uniform in vertex shader with new rotation angle

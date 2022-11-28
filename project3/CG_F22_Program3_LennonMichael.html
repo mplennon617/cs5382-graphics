@@ -5,25 +5,34 @@
 
     precision mediump float;
 
+    // Attributes and output values
     in  vec4 aPosition;
     in  vec4 aNormal;
     in  vec4 aColor;
     out vec4 vColor;
 
-    uniform vec3 uThetaView;
+    in  vec2 aTexCoord;
+    out vec2 vTexCoord;
 
-    uniform vec4 uLightPosition;
-    uniform mat3 uNormalMatrix;
+    out vec3 L;
+
+    // Model and View Uniforms
+    uniform vec3 uThetaView;
 
     uniform mat4 modelViewMatrix;
     uniform mat4 projectionMatrix;
+
+    // Light Uniforms
+    uniform vec4 uLightPosition;
+    uniform mat3 uNormalMatrix;
 
     uniform vec4 uLightAmbient;
     uniform vec4 uDiffuseProduct;
     uniform vec4 uSpecularProduct;
     uniform float uShininess;
 
-    vec3 N, L, E;
+    // "Local" vectors
+    vec3 N, E;
 
     void main()
     {
@@ -82,6 +91,10 @@
 
         vColor = ambient + diffuse +specular;
         vColor.a = 1.0;
+
+        // Define Texture Coordinate.
+        
+        vTexCoord = aTexCoord;
     }
   </script>
 
@@ -93,12 +106,145 @@
     in vec4 vColor;
     out vec4 fColor;
 
-    void
-    main() 
+    in vec3 L;
+    in vec2 vTexCoord;
+
+    uniform sampler2D uTexMap;
+    uniform vec4 uDiffuseProduct;
+
+    void main() 
     {
-        fColor = vColor;
+      fColor = vColor;
     }
   </script>
+
+
+  <script id="vertex-shader-2" type="x-shader/x-vertex">
+    #version 300 es
+
+    precision mediump float;
+
+    // Attributes and output values
+    in  vec4 aPosition;
+    in  vec4 aNormal;
+    in  vec4 aColor;
+    out vec4 vColor;
+
+    in  vec2 aTexCoord;
+    out vec2 vTexCoord;
+
+    out vec3 L;
+
+    // Model and View Uniforms
+    uniform vec3 uThetaView;
+
+    uniform mat4 modelViewMatrix;
+    uniform mat4 projectionMatrix;
+
+    // Light Uniforms
+    uniform vec4 uLightPosition;
+    uniform mat3 uNormalMatrix;
+
+    uniform vec4 uLightAmbient;
+    uniform vec4 uDiffuseProduct;
+    uniform vec4 uSpecularProduct;
+    uniform float uShininess;
+
+    // "Local" vectors
+    vec3 N, E;
+
+    void main()
+    {
+        // Determine Vertex Position.
+
+        // Compute the sines and cosines of theta for each of
+        //   the three axes in one computation.
+        vec3 angles =  uThetaView ; // convert degrees to radians
+        vec3 c = cos( angles );
+        vec3 s = sin( angles );
+
+        // Remeber: thse matrices are column-major
+        mat4 rx = mat4( 1.0,  0.0,  0.0, 0.0,
+                0.0,  c.x,  s.x, 0.0,
+                0.0, -s.x,  c.x, 0.0,
+                0.0,  0.0,  0.0, 1.0 );
+
+        mat4 ry = mat4( c.y, 0.0, -s.y, 0.0,
+                0.0, 1.0,  0.0, 0.0,
+                s.y, 0.0,  c.y, 0.0,
+                0.0, 0.0,  0.0, 1.0 );
+
+
+        mat4 rz = mat4( c.z, s.z, 0.0, 0.0,
+                -s.z,  c.z, 0.0, 0.0,
+                0.0,  0.0, 1.0, 0.0,
+                0.0,  0.0, 0.0, 1.0 );
+
+        mat4 rotationViewMatrix = (rz * ry * rx);
+
+        // Determine Vertex Color based on lighting.
+
+        vec3 light;
+        vec3 pos = (projectionMatrix * modelViewMatrix * aPosition).xyz;
+        if(uLightPosition.z == 0.0)  
+              L = normalize(uLightPosition.xyz);
+        else  
+              L = normalize(uLightPosition).xyz - pos;
+    
+        E =  -normalize(pos);
+        N = normalize(uNormalMatrix*aNormal.xyz);
+
+        vec3 H = normalize( L + E );
+        vec4 ambient = uLightAmbient * aColor; // TODO: I use the color attribute here. Make sure this is correct.
+    
+        float Kd = max( dot(L, N), 0.0 );
+        vec4  diffuse = Kd*uDiffuseProduct;
+    
+        float Ks = pow( max(dot(N, H), 0.0), uShininess );
+        vec4  specular = Ks * uSpecularProduct;
+    
+        if( dot(L, N) < 0.0 ) specular = vec4(0.0, 0.0, 0.0, 1.0);
+    
+        gl_Position = projectionMatrix * rotationViewMatrix * modelViewMatrix * aPosition;
+        gl_PointSize = 30.0;
+
+        vColor = ambient + diffuse +specular;
+        vColor.a = 1.0;
+
+        // Define Texture Coordinate.
+        
+        vTexCoord = aTexCoord;
+    }
+  </script>
+
+  <script id="fragment-shader-2" type="x-shader/x-fragment">
+    #version 300 es
+
+    precision mediump float;
+
+    in vec4 vColor;
+    out vec4 fColor;
+
+    in vec3 L;
+    in vec2 vTexCoord;
+
+    uniform sampler2D uTexMap;
+    uniform vec4 uDiffuseProduct;
+
+    void main() 
+    {
+      fColor = vColor;
+
+//      // 
+      vec4 N = texture(uTexMap, vTexCoord);
+      vec3 NN =  normalize(2.0*N.xyz-1.0);
+      vec3 LL = normalize(L);
+      float Kd = max(dot(NN, LL), 0.0);
+
+//    fColor = vec4(Kd*uDiffuseProduct.xyz, 1.0);
+    }
+  </script>
+
 
   <script type="text/javascript" src="../Common/initShaders.js"></script>
   <script src="../Common/MVnew.js"></script>
