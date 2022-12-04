@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html>
+  <script id="vertex-shader" type="x-shader/x-vertex">
+    #version 300 es
+    // Code adopted and modified from Hello2DTexture_ImageFile.html
+
+    in vec4 aPosition;
+    in vec2 aTexCoord;
+    
+    out vec2 vTexCoord;
+    
+    void main()
+    {
+        gl_Position = aPosition;
+        vTexCoord = aTexCoord;
+    }
+    </script>
+
+    
+    <script id="fragment-shader-1" type="x-shader/x-fragment">
+      #version 300 es
+      // Code adopted and modified from Hello2DTexture_ImageFile.html
+
+      precision mediump float;
+      
+      
+      in vec2 vTexCoord;
+      out vec4 fColor;
+      uniform sampler2D uTexMap;
+      
+      void main()
+      {
+         fColor = texture(uTexMap, vTexCoord);
+      
+      }
+    </script>
+    <!-- <script id="fragment-shader-2" type="x-shader/x-fragment">
+    #version 300 es
+    precision mediump float;
+    
+    in vec2 vTexCoord;
+    out vec4 fColor;
+    
+    uniform sampler2D uTextureMap;
+    
+    void main()
+    {
+        float s = 4.0;
+        float d = 1.0/1024.0;
+        float x = vTexCoord.x;
+        float y = vTexCoord.y;
+        vec4 t = (//texture(uTextureMap, vec2(x,y))
+                       +texture(uTextureMap, vec2(x+d, y))
+                       +texture(uTextureMap, vec2(x, y+d))
+                       +texture(uTextureMap, vec2(x-d, y))
+                      +texture(uTextureMap, vec2(x, y-d)))/s;
+        //gl_FragColor.r = t.r;
+        if(t.r > 0.0) fColor.r = 1.0;
+        else fColor.r = 0.0;
+        fColor.g = t.g;
+        fColor.b = t.b;
+        fColor.a = 1.0;
+        //fColor = t;
+        if(t.r>0.0) fColor = vec4(1.0, 0.0, 0.0, 1.0);
+        else fColor = vec4(1.0, 1.0, 1.0, 1.0);
+        fColor = t;
+    }
+    </script> -->
+
+  <script type="text/javascript" src="../Common/initShaders.js"></script>
+  <script src="../Common/MVnew.js"></script>
+  <script
+    type="text/javascript"
+    src="CG_F22_Program4A_LennonMichael.js"
+  ></script>
+  <link rel="stylesheet" href="styles.css" />
+  <body>
+    <div class="center">
+      <canvas id="gl-canvas" width="600" height="600">
+        Oops ... your browser doesn't support the HTML5 canvas element
+      </canvas>
+
+      <hr>
+      
+      <label for="programDropdown">Technique:</label>
+      <select name="programDropdown" id="programDropdown">
+        <option value="original">Original</option>
+        <option value="toon">Toon</option>
+        <option value="distort">Distort</option>
+        <option value="halftone">Halftone</option>
+      </select>
+    </div>
+  </body>
+</html>

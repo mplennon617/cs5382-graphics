@@ -655,7 +655,7 @@ const buildInstances = () => {
  * @param {*} image - the image to configure.
  */
 const configureTexture = (image) => {
-  console.log("configuring texture with image",image);
+  console.log("configuring texture with image", image);
   let texture = gl.createTexture();
   gl.activeTexture(gl.TEXTURE0);
   gl.bindTexture(gl.TEXTURE_2D, texture);
@@ -712,11 +712,14 @@ const textureMapping = () => {
       for (let j = 0; j < texSize; j++) normalst[i][j] = new Array();
     for (let i = 0; i < texSize; i++)
       for (let j = 0; j < texSize; j++) {
-        normalst[i][j][0] = normalizedData[i*texSize+j] - normalizedData[(i+1)*texSize+j];
-        normalst[i][j][1] = normalizedData[i*texSize+j] - normalizedData[i*texSize+j+1];
+        normalst[i][j][0] =
+          normalizedData[i * texSize + j] -
+          normalizedData[(i + 1) * texSize + j];
+        normalst[i][j][1] =
+          normalizedData[i * texSize + j] - normalizedData[i * texSize + j + 1];
         normalst[i][j][2] = 1;
       }
-      console.log("normalst:",normalst);
+    console.log("normalst:", normalst);
 
     // Scale to Texture Coordinates (Adopted from bumpMap.js)
 
@@ -728,7 +731,7 @@ const textureMapping = () => {
         for (let k = 0; k < 3; k++)
           normalst[i][j][k] = (0.5 * normalst[i][j][k]) / d + 0.5;
       }
-      console.log("normalst scaled:",normalst);
+    console.log("normalst scaled:", normalst);
 
     // Normal Texture Array (Adopted from bumpMap.js)
     let normals = new Uint8Array(3 * texSize * texSize);
@@ -737,7 +740,7 @@ const textureMapping = () => {
       for (let j = 0; j < texSize; j++)
         for (let k = 0; k < 3; k++)
           normals[3 * texSize * i + 3 * j + k] = 255 * normalst[i][j][k];
-    console.log("normals:",normals);
+    console.log("normals:", normals);
 
     // Configure the bump map texture with the resulting normal texture array.
     configureTexture(normals);
