@@ -122,7 +122,7 @@ window.onload = function init() {
   ////////  Callback for FileReader to use Image Data File /////
   ////////    provided, and modified, with permission from student in CS 5382 Spring 2022
 
-  document.getElementById("fileInput").onselect = (e) => {
+  document.getElementById("fileInput").onchange = (e) => {
     // Get the file data from the event variable
     let file = e.target.files[0];
 
@@ -156,6 +156,7 @@ window.onload = function init() {
           resultImage.height
         );
         console.log(imageData.width, imageData.height);
+        console.log(imageData);
 
         // Convert to a Uint8Array (not necessary)
         let image = new Uint8Array(resultImage.width * resultImage.height * 4);

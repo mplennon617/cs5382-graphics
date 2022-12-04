@@ -7,16 +7,13 @@
 
 let canvas; // Drawing surface
 let gl; // Graphics context
+
 let programs = []; // GL Programs for each of the processed images.
-let t = 0; // Define t steps during the render process.
-
+let shaderIdx = 0; // Index to the shader program to use (in the programs array).
+let imageSrc = "StyleGAN2FaceSmall.png";
 // Hardcoded rectangle vertex.
-let vertices = [vec2(-1, -1), vec2(-1, 1), vec2(1, -1), vec2(1, 1)]; // List of all vertices. An array of vec2s
-
-let texCoords = [vec2(0, 0), vec2(0, 1), vec2(1, 0), vec2(1, 1)]; // List of all texture coordinates. An array of vec2s
-
-// Texture constants.
-let texSize = 1024; // Size of the bump map image.
+let vertices = [vec2(-1, -1), vec2(1, -1), vec2(1, 1), vec2(-1, 1)]; // List of all vertices. An array of vec2s
+let texCoords = [vec2(1, 1), vec2(0, 1), vec2(0, 0), vec2(1, 0)]; // List of all texture coordinates. An array of vec2s
 
 // -----------------------------------------------------------------------------------------------
 //                                        Fill Functions
@@ -37,28 +34,6 @@ const fillVertices = (newVertices) => {
 const fillTexCoords = (newTexCoords) => {
   texCoords = texCoords.concat(newTexCoords); // #NewNormal
 };
-
-// -----------------------------------------------------------------------------------------------
-//                      Utility functions for calculating vertices and indices
-// -----------------------------------------------------------------------------------------------
-
-// /**
-//  * Returns a list of points representing a 2D rectangle.
-//  *
-//  * @param {float} x - X offset position.
-//  * @param {float} y - Y offset position.
-//  * @param {float} w - width (x side length) of the rectangle
-//  * @param {float} h - height (y side length) of the rectangle
-//  * @returns An array containing the 4 rectangle points.
-//  */
-// const getRectanglePoints = (x = 0.0, y = 0.0, w = 1.0, h = 1.0) => {
-//   let points = [];
-//   points.push(vec2(x, y));
-//   points.push(vec2(x + w, y));
-//   points.push(vec2(x, y + h));
-//   points.push(vec2(x + w, y + h));
-//   return points;
-// };
 
 // -----------------------------------------------------------------------------------------------
 //                                       Other Utility Functions
@@ -90,10 +65,6 @@ const range = (start, end) => {
 //                                        Instance Building
 // -----------------------------------------------------------------------------------------------
 
-// -----------------------------------------------------------------------------------------------
-//                                        Instance Building
-// -----------------------------------------------------------------------------------------------
-
 /**
  * Function used to prepare the vertices and texCoords to be drawn.
  */
@@ -111,56 +82,58 @@ const buildInstances = () => {
  * Function for configuring the 1024x1024 bump map texture.
  * @param {*} image - the image to configure.
  */
-const configureTexture = (image) => {
-  console.log("configuring texture with image", image);
-  let texture = gl.createTexture();
+const configureTexture = (image, width, height) => {
+  // console.log("configuring texture with image", image);
+
+  var texture = gl.createTexture();
   gl.activeTexture(gl.TEXTURE0);
   gl.bindTexture(gl.TEXTURE_2D, texture);
   gl.texImage2D(
     gl.TEXTURE_2D,
     0,
-    gl.RGB,
-    texSize,
-    texSize,
+    gl.RGBA,
+    width,
+    height,
     0,
-    gl.RGB,
+    gl.RGBA,
     gl.UNSIGNED_BYTE,
     image
   );
   gl.generateMipmap(gl.TEXTURE_2D);
+  gl.texParameteri(
+    gl.TEXTURE_2D,
+    gl.TEXTURE_MIN_FILTER,
+    gl.NEAREST_MIPMAP_LINEAR
+  );
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
 };
 
-// TODO: Use https://webgl2fundamentals.org/webgl/lessons/webgl-image-processing.html
 const textureMapping = () => {
-  let img = new Image();
-  const url = "StyleGAN2Face.jpeg";
-  img.src = url;
-  img.onload = () => {
+  let imageElement = new Image();
+  const url = imageSrc;
+  imageElement.src = url;
+  imageElement.onload = () => {
     // *****onLoad code adopted from Hello2DTexture_ImageFileReader.js
     let canvas = document.createElement("canvas");
     let ctx = canvas.getContext("2d");
 
-    texSize = img.width; // Rendundant, but forces texSize variable to adjust if a different image is used
     // Render the loaded image to the canvas
-    ctx.drawImage(img, 0, 0, img.width, img.height);
+    ctx.drawImage(imageElement, 0, 0, imageElement.width, imageElement.height);
     // Get the image rendered to the canvas, returns a Uint8ClampedArray
     let imageData = ctx.getImageData(
       0,
       0,
-      img.width,
-      img.height
-    ); // FIXME: Why is most of the data 0?
-    console.log(imageData.width, imageData.height);
-    console.log(imageData);
+      imageElement.width,
+      imageElement.height
+    );
 
     // Convert to Array for modification
-    let image = new Uint8Array(img.width * img.height * 4);
-    for (let i = 0; i < img.width * img.height * 4; i++)
+    let image = new Uint8Array(imageElement.width * imageElement.height * 4);
+    for (let i = 0; i < imageElement.width * imageElement.height * 4; i++)
       image[i] = imageData.data[i];
 
-      console.log(image);
     // Configure the texture with the resulting normal texture array.
-    configureTexture(image);
+    configureTexture(image, imageElement.width, imageElement.height);
   };
 };
 
@@ -183,10 +156,9 @@ const bindBuffers = () => {
     gl.enableVertexAttribArray(positionLoc);
 
     // Bind Texture (TEXCOORDS) to the gl array buffer.
-    // TODO: Complete
     let tBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, tBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, flatten(texCoords), gl.STATIC_DRAW);
+    gl.bufferData(gl.ARRAY_BUFFER, texCoords, gl.STATIC_DRAW);
 
     let texCoordLoc = gl.getAttribLocation(program, "aTexCoord");
     gl.vertexAttribPointer(texCoordLoc, 2, gl.FLOAT, false, 0, 0);
@@ -195,14 +167,18 @@ const bindBuffers = () => {
 };
 
 /**
- * Function used for setting up Slider behavior in the HTML.
+ * Function used for setting up UI behavior in the HTML.
  */
 const setupUI = () => {
   // Define javascript events for the HTML elements used to manipulate the scene.
-  // *****  Reset, Freeze, and Big Jump (From Program 2) *****
-  // document.getElementById("ButtonR").onclick = () => {
-  //   figureSliderVals = [0, 0, 0, 0, 0];
-  // };
+  // ***** Image Processing Technique Dropdown *****
+  document.getElementById("programDropdown").onchange = (el) => {
+    shaderIdx = document.getElementById("programDropdown").value;
+  };
+  // ***** Image Dropdown *****
+  document.getElementById("imageDropdown").onchange = (el) => {
+    imageSrc = document.getElementById("imageDropdown").value;
+  };
 };
 
 /**
@@ -224,8 +200,9 @@ window.onload = () => {
   //  Load all shaders and initialize attribute buffers
   //
   programs.push(initShaders(gl, "vertex-shader", "fragment-shader-1"));
-  // programs.push(initShaders(gl, "vertex-shader", "fragment-shader-2"));
-  // programs.push(initShaders(gl, "vertex-shader", "fragment-shader-3"));
+  programs.push(initShaders(gl, "vertex-shader", "fragment-shader-2"));
+  programs.push(initShaders(gl, "vertex-shader", "fragment-shader-3"));
+  programs.push(initShaders(gl, "vertex-shader", "fragment-shader-4"));
   gl.useProgram(programs[0]);
 
   // Fill colors and vertices arrays with all the shapes.
@@ -234,9 +211,11 @@ window.onload = () => {
   // Bind all array buffers used by gl.drawArrays().
   bindBuffers();
 
-  // Setup the bumpmap textures.
-  // TODO: Texture mapping
+  // Setup the texture.
   textureMapping();
+
+  // Map the texture to the program.
+  gl.uniform1i(gl.getUniformLocation(programs[0], "uTexMap"), 0);
 
   // Setup slider behavior on the UI.
   setupUI();
@@ -253,12 +232,14 @@ window.onload = () => {
  * Main Render function.
  */
 const render = () => {
-  gl.useProgram(programs[0]);
+  gl.useProgram(programs[shaderIdx]);
+
+  textureMapping();
 
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
   // ***** Draw each part of the figure, manipulating the model View matrix as we go. *****
-  gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+  gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
 
   requestAnimationFrame(render); // Call to browser to refresh display
 };

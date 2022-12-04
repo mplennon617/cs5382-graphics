@@ -4,68 +4,254 @@
     #version 300 es
     // Code adopted and modified from Hello2DTexture_ImageFile.html
 
+    /* bump map vertex shader */
+
     in vec4 aPosition;
     in vec2 aTexCoord;
-    
     out vec2 vTexCoord;
-    
+
     void main()
     {
         gl_Position = aPosition;
         vTexCoord = aTexCoord;
     }
-    </script>
+  </script>
 
-    
-    <script id="fragment-shader-1" type="x-shader/x-fragment">
-      #version 300 es
-      // Code adopted and modified from Hello2DTexture_ImageFile.html
-
-      precision mediump float;
-      
-      
-      in vec2 vTexCoord;
-      out vec4 fColor;
-      uniform sampler2D uTexMap;
-      
-      void main()
-      {
-         fColor = texture(uTexMap, vTexCoord);
-      
-      }
-    </script>
-    <!-- <script id="fragment-shader-2" type="x-shader/x-fragment">
+  <script id="fragment-shader-1" type="x-shader/x-fragment">
     #version 300 es
+
     precision mediump float;
-    
+
+
     in vec2 vTexCoord;
     out vec4 fColor;
-    
-    uniform sampler2D uTextureMap;
-    
+    uniform sampler2D uTexMap;
+
     void main()
     {
-        float s = 4.0;
-        float d = 1.0/1024.0;
-        float x = vTexCoord.x;
-        float y = vTexCoord.y;
-        vec4 t = (//texture(uTextureMap, vec2(x,y))
-                       +texture(uTextureMap, vec2(x+d, y))
-                       +texture(uTextureMap, vec2(x, y+d))
-                       +texture(uTextureMap, vec2(x-d, y))
-                      +texture(uTextureMap, vec2(x, y-d)))/s;
-        //gl_FragColor.r = t.r;
-        if(t.r > 0.0) fColor.r = 1.0;
-        else fColor.r = 0.0;
-        fColor.g = t.g;
-        fColor.b = t.b;
-        fColor.a = 1.0;
-        //fColor = t;
-        if(t.r>0.0) fColor = vec4(1.0, 0.0, 0.0, 1.0);
-        else fColor = vec4(1.0, 1.0, 1.0, 1.0);
-        fColor = t;
+       fColor = texture(uTexMap, vTexCoord);
+       //fColor = vec4(vTexCoord.x,vTexCoord.y,1.0,1.0);
+
     }
-    </script> -->
+  </script>
+  <script id="fragment-shader-2" type="x-shader/x-fragment">
+    #version 300 es
+
+    // *************************************************************************
+    // *  Toon Shading code adopted from page 267 in Graphics Shaders Ch 11.   *
+    // *************************************************************************
+
+    precision mediump float;
+
+    in vec2 vTexCoord;
+    out vec4 fColor;
+
+    uniform sampler2D uTexMap;
+
+    void main()
+    {
+      //float uMagTol = 1.0;
+      //float uQuantize = 4.0;
+
+      float uMagTol = 3.0;
+      float uQuantize = 2.0;
+
+      ivec2 ires = textureSize( uTexMap, 0 );
+      float ResS = float( ires.s );
+      float ResT = float( ires.t );
+      vec3 irgb = texture( uTexMap, vTexCoord ).rgb;
+      //vec3 brgb = texture( uBeforeUnit, vTexCoord ).rgb;
+      //vec3 argb = texture( uAfterUnit, vTexCoord ).rgb;
+      vec3 rgb = texture( uTexMap, vTexCoord ).rgb;
+      vec2 stp0 = vec2(1./ResS, 0. );
+      vec2 st0p = vec2(0. , 1./ResT);
+      vec2 stpp = vec2(1./ResS, 1./ResT);
+      vec2 stpm = vec2(1./ResS, -1./ResT);
+      const vec3 W = vec3( 0.2125, 0.7154, 0.0721 );
+      float i00 = dot( texture( uTexMap, vTexCoord).rgb, W );
+      float im1m1= dot( texture( uTexMap, vTexCoord-stpp ).rgb, W );
+      float ip1p1= dot( texture( uTexMap, vTexCoord+stpp ).rgb, W );
+      float im1p1= dot( texture( uTexMap, vTexCoord-stpm ).rgb, W );
+      float ip1m1= dot( texture( uTexMap, vTexCoord+stpm ).rgb, W );
+      float im10 = dot( texture( uTexMap, vTexCoord-stp0 ).rgb, W );
+      float ip10 = dot( texture( uTexMap, vTexCoord+stp0 ).rgb, W );
+      float i0m1 = dot( texture( uTexMap, vTexCoord-st0p ).rgb, W );
+      float i0p1 = dot( texture( uTexMap, vTexCoord+st0p ).rgb, W );
+      // next two lines apply the H and V Sobel filters at the pixel
+      float h= -1.*im1p1-2.*i0p1-1.*ip1p1+1.*im1m1+2.*i0m1+1.*ip1m1;
+      float v= -1.*im1m1-2.*im10-1.*im1p1+1.*ip1m1+2.*ip10+1.*ip1p1;
+      float mag = length( vec2( h, v ) ); // how much change
+       // is there?
+      if( mag > uMagTol )
+      { // if too much, use black
+       fColor = vec4( 0., 0., 0., 1. );
+      }
+      else
+      { // else quantize the color
+       rgb.rgb *= uQuantize;
+       rgb.rgb += vec3( .5, .5, .5 ); // round
+       ivec3 intrgb = ivec3( rgb.rgb ); // truncate
+       rgb.rgb = vec3( intrgb ) / uQuantize;
+       fColor = vec4( rgb, 1. );
+      }
+    }
+  </script>
+  <script id="fragment-shader-3" type="x-shader/x-fragment">
+    #version 300 es
+
+    // ******************************************************************************
+    // * Twirl transformation code adopted from page 267 in Graphics Shaders Ch 11. *
+    // ******************************************************************************
+
+    precision mediump float;
+
+    in vec2 vTexCoord;
+    out vec4 fColor;
+
+    uniform sampler2D uTexMap;
+    //uniform float uD, uR; // TODO: Add uniform for this?
+
+    void main()
+    {
+      float uD = 300.0;
+      float uR = 1.0;
+
+      ivec2 ires = textureSize( uTexMap, 0 );
+      float Res = float( ires.s ); // assume it’s a square
+      // texture image
+      vec2 st = vTexCoord;
+      float Radius = Res * uR;
+      vec2 xy = Res * st; // pixel coordinates from
+      // texture coords
+      vec2 dxy = xy - Res/2.; // twirl center is (Res/2, Res/2)
+      float r = length( dxy );
+      float beta = atan(dxy.y,dxy.x) + radians(uD)*
+      (Radius-r)/Radius;
+      vec2 xy1 = xy;
+      if (r <= Radius)
+      {
+       xy1 = Res/2. + r * vec2( cos(beta), sin(beta) );
+      }
+      st = xy1/Res; // restore coordinates
+      vec3 irgb = texture( uTexMap, st ).rgb;
+      fColor = vec4( irgb, 1. );
+    }
+  </script>
+  <script id="fragment-shader-4" type="x-shader/x-fragment">
+    #version 300 es
+
+    // ******************************************************************************
+    // *      Halftoning code adopted from step 6 in the following website:         *
+    // *   https://weber.itn.liu.se/~stegu/webglshadertutorial/shadertutorial.html  *
+    // ******************************************************************************
+
+
+    #ifdef GL_OES_standard_derivatives
+    #extension GL_OES_standard_derivatives : enable
+    #endif
+
+    precision mediump float;
+
+    float uScale = 10.0; // For imperfect, isotropic anti-aliasing in
+    float uYrot = 1.0;  // absence of dFdx() and dFdy() functions
+
+    uniform sampler2D uTexMap;
+    vec2 uDims = vec2(200.0,200.0);
+
+    in vec2 vTexCoord;
+    out vec4 fColor;
+
+    float frequency = 40.0; // Needed globally for lame version of aastep()
+
+    float aastep(float threshold, float value) {
+    #ifdef GL_OES_standard_derivatives
+      float afwidth = 0.7 * length(vec2(dFdx(value), dFdy(value)));
+    #else
+      float afwidth = frequency * (1.0/200.0) / uScale / cos(uYrot);
+    #endif
+      return smoothstep(threshold-afwidth, threshold+afwidth, value);
+    }
+
+    // Explicit bilinear texture lookup to circumvent bad hardware precision.
+    // The extra arguments specify the dimension of the texture. (GLSL 1.30
+    // introduced textureSize() to get that information from the sampler.)
+    // 'dims' is the width and height of the texture, 'one' is 1.0/dims.
+    // (Precomputing 'one' saves two divisions for each lookup.)
+    vec4 texture2D_bilinear(sampler2D tex, vec2 st, vec2 dims, vec2 one) {
+      vec2 uv = st * dims;
+      vec2 uv00 = floor(uv - vec2(0.5)); // Lower left corner of lower left texel
+      vec2 uvlerp = uv - uv00 - vec2(0.5); // Texel-local lerp blends [0,1]
+      vec2 st00 = (uv00 + vec2(0.5)) * one;
+      vec4 texel00 = texture(tex, st00);
+      vec4 texel10 = texture(tex, st00 + vec2(one.x, 0.0));
+      vec4 texel01 = texture(tex, st00 + vec2(0.0, one.y));
+      vec4 texel11 = texture(tex, st00 + one);
+      vec4 texel0 = mix(texel00, texel01, uvlerp.y);
+      vec4 texel1 = mix(texel10, texel11, uvlerp.y);
+      return mix(texel0, texel1, uvlerp.x);
+    }
+
+    // Description : Array- and textureless GLSL 2D simplex noise.
+    // Author : Ian McEwan, Ashima Arts. Version: 20110822
+    // Copyright (C) 2011 Ashima Arts. All rights reserved.
+    // Distributed under the MIT License. See LICENSE file.
+    // https://github.com/ashima/webgl-noise
+
+    vec2 mod289(vec2 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
+    vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
+    vec3 permute(vec3 x) { return mod289((( x * 34.0) + 1.0) * x); }
+
+    float snoise(vec2 v) {
+      const vec4 C = vec4(0.211324865405187,  // (3.0-sqrt(3.0))/6.0
+                          0.366025403784439,  // 0.5*(sqrt(3.0)-1.0)
+                         -0.577350269189626,  // -1.0 + 2.0 * C.x
+                          0.024390243902439); // 1.0 / 41.0
+      // First corner
+      vec2 i = floor(v + dot(v, C.yy) );
+      vec2 x0 = v - i + dot(i, C.xx);
+      // Other corners
+      vec2 i1 = (x0.x > x0.y) ? vec2(1.0, 0.0) : vec2(0.0, 1.0);
+      vec4 x12 = x0.xyxy + C.xxzz;
+      x12.xy -= i1;
+      // Permutations
+      i = mod289(i); // Avoid truncation effects in permutation
+      vec3 p = permute( permute( i.y + vec3(0.0, i1.y, 1.0 ))
+                               + i.x + vec3(0.0, i1.x, 1.0 ));
+      vec3 m = max(0.5 - vec3(dot(x0,x0), dot(x12.xy,x12.xy),
+                              dot(x12.zw,x12.zw)), 0.0);
+      m = m*m; m = m*m;
+      // Gradients
+      vec3 x = 2.0 * fract(p * C.www) - 1.0;
+      vec3 h = abs(x) - 0.5;
+      vec3 a0 = x - floor(x + 0.5);
+      // Normalise gradients implicitly by scaling m
+      m *= 1.792843 - 0.853735 * ( a0*a0 + h*h );
+      // Compute final noise value at P
+      vec3 g;
+      g.x = a0.x * x0.x + h.x * x0.y;
+      g.yz = a0.yz * x12.xz + h.yz * x12.yw;
+      return 130.0 * dot(m, g);
+    }
+
+    void main() {
+
+        // Distance to nearest point in a grid of
+        // (frequency x frequency) points over the unit square
+        vec2 st2 = mat2(0.707, -0.707, 0.707, 0.707) * vTexCoord;
+        vec2 nearest = 2.0*fract(frequency * st2) - 1.0;
+        float dist = length(nearest);
+        // Use a texture to modulate the size of the dots
+        vec3 texcolor = texture2D_bilinear(uTexMap, vTexCoord, uDims, 1.0/uDims).rgb;
+        float radius = sqrt(1.0-texcolor.g); // Use green channel
+        float n = 0.1*snoise(vTexCoord*200.0); // Fractal noise
+        n += 0.05*snoise(vTexCoord*400.0);
+        n += 0.025*snoise(vTexCoord*800.0);
+        vec3 white = vec3(n*0.5 + 0.98);
+        vec3 black = vec3(n + 0.1);
+        vec3 fragcolor = mix(black, white, aastep(radius, dist+n));
+        fColor = vec4(fragcolor, 1.0);
+    }
+  </script>
 
   <script type="text/javascript" src="../Common/initShaders.js"></script>
   <script src="../Common/MVnew.js"></script>
@@ -76,18 +262,26 @@
   <link rel="stylesheet" href="styles.css" />
   <body>
     <div class="center">
+      <h2>CS 7382 Program 4 - Michael Lennon</h2>
       <canvas id="gl-canvas" width="600" height="600">
         Oops ... your browser doesn't support the HTML5 canvas element
       </canvas>
 
-      <hr>
-      
+      <hr />
+
       <label for="programDropdown">Technique:</label>
       <select name="programDropdown" id="programDropdown">
-        <option value="original">Original</option>
-        <option value="toon">Toon</option>
-        <option value="distort">Distort</option>
-        <option value="halftone">Halftone</option>
+        <option value="0">Original</option>
+        <option value="1">Toon</option>
+        <option value="2">Twirl</option>
+        <option value="3">Halftone</option>
+      </select>
+
+      <br>
+      <label for="imageDropdown">Image:</label>
+      <select name="imageDropdown" id="imageDropdown">
+        <option value="StyleGAN2FaceSmall.png">StyleGAN 2 Face</option>
+        <option value="robin-square.png">HackSMU Robin (I love him)</option>
       </select>
     </div>
   </body>

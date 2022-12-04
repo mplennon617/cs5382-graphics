@@ -176,6 +176,10 @@ function init() {
     document.getElementById("ButtonY").onclick = function(){axis = yAxis;};
     document.getElementById("ButtonZ").onclick = function(){axis = zAxis;};
 
+
+    console.log("positions:",positionsArray);
+    console.log("texcoords:",texCoordsArray);
+
     render();
 }
 

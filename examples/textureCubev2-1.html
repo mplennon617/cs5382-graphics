@@ -68,13 +68,14 @@ uniform sampler2D uTextureMap;
 void
 main()
 {
-    fColor = vColor*texture(uTextureMap, vTexCoord );
+    //fColor = vColor*texture(uTextureMap, vTexCoord );
+    fColor = vec4(vTexCoord.x,vTexCoord.y,1.0,1.0);
 }
 </script>
 
 <script src="../Common/initShaders.js"></script>
 <script src="../Common/MVnew.js"></script>
-<script src="textureCubev2.js"></script>
+<script src="textureCubev2-1.js"></script>
 
 </body>
 </html>
